@@ -49,6 +49,7 @@ export default function Page() {
 
     if (!move) return false;
 
+    setGame(new Chess(afterPlayerMove.fen()));
     setIsComputerThinking(true);
 
     try {
@@ -68,10 +69,10 @@ export default function Page() {
       );
 
       if (!afterPlayerMove.isGameOver() && afterAnalysis.bestMove) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
         applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
+        setGame(new Chess(afterPlayerMove.fen()));
       }
-
-      setGame(afterPlayerMove);
       return true;
     } catch {
       if (!afterPlayerMove.isGameOver()) {
@@ -86,7 +87,7 @@ export default function Page() {
           history: before.history(),
         }),
       );
-      setGame(afterPlayerMove);
+      setGame(new Chess(afterPlayerMove.fen()));
       return false;
     } finally {
       setIsComputerThinking(false);
