@@ -2,102 +2,210 @@
   box-sizing: border-box;
 }
 
+html {
+  background: #f7f7f5;
+}
+
 body {
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: #f5f7fb;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), rgba(247, 247, 245, 0.8) 40%),
+    linear-gradient(180deg, #fbfbf8 0%, #f2efe8 100%);
   color: #1f2937;
 }
 
-.page-wrap {
-  max-width: 1200px;
+button {
+  font: inherit;
+}
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  max-width: 1300px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 24px;
+}
+
+.boardColumn,
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero {
+  display: grid;
+  gap: 8px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #8a6f3d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 h1 {
-  margin-bottom: 0.4rem;
+  margin: 0;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  line-height: 0.95;
 }
 
 .intro {
-  margin-top: 0;
-  margin-bottom: 1rem;
-  color: #475569;
+  margin: 0;
+  max-width: 58ch;
+  color: #4b5563;
+  line-height: 1.6;
 }
 
-.layout {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr;
+.boardPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.side-col {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
-}
-
-.board-card,
+.boardWrap,
 .panel {
   background: #ffffff;
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 4px 14px rgba(22, 33, 54, 0.08);
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(31, 41, 55, 0.08);
+}
+
+.boardWrap {
+  width: 100%;
+  max-width: 720px;
+  padding: 14px;
+}
+
+.panel {
+  padding: 18px;
 }
 
 .panel h2 {
   margin-top: 0;
-  font-size: 1.1rem;
+  margin-bottom: 14px;
+  font-size: 1.05rem;
 }
 
-.coach-grid {
+.infoGrid {
   display: grid;
-  gap: 0.75rem;
+  gap: 10px;
 }
 
-.coach-box {
-  border: 1px solid #dbe4ee;
-  border-radius: 10px;
-  padding: 0.75rem;
-  background: #f9fbff;
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8f8f6;
 }
 
-.coach-box h3 {
-  margin-top: 0;
-  margin-bottom: 0.45rem;
-  font-size: 0.95rem;
+.infoRow span {
+  color: #6b7280;
 }
 
-.move-list {
-  max-height: 220px;
-  overflow: auto;
-  padding-left: 1.25rem;
-  margin-bottom: 0;
+.infoRow strong {
+  text-align: right;
 }
 
-.reset-btn {
-  margin-top: 0.5rem;
+.coachBox {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.coachBox h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.coachBox p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.coachBoxPositive {
+  background: #e7f7ec;
+}
+
+.coachBoxWarning {
+  background: #fff7db;
+}
+
+.coachBoxIdea {
+  background: #fdeaea;
+}
+
+.boardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.resetBtn {
   border: none;
-  border-radius: 10px;
-  padding: 0.65rem 0.95rem;
-  background: #1d4ed8;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #111827;
   color: #fff;
   cursor: pointer;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: transform 120ms ease, background-color 120ms ease;
 }
 
-.reset-btn:hover {
-  background: #1e40af;
+.resetBtn:hover {
+  background: #1f2937;
+  transform: translateY(-1px);
 }
 
 .thinking {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7db;
   font-weight: 600;
-  color: #1d4ed8;
+  color: #8a5b00;
 }
 
-@media (min-width: 980px) {
-  .layout {
-    grid-template-columns: minmax(420px, 600px) minmax(320px, 1fr);
-    align-items: start;
+.statusNote {
+  margin: 0;
+  color: #6b7280;
+}
+
+.moveList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.moveList li {
+  line-height: 1.45;
+}
+
+.emptyMove {
+  color: #6b7280;
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .boardWrap {
+    max-width: 100%;
+    padding: 10px;
   }
 }

@@ -1,22 +1,26 @@
-type GameInfoProps = {
-  status: string;
-  turn: string;
-  onReset: () => void;
-};
+import { Chess } from 'chess.js';
+import { getGameStatus, getTurnLabel } from '@/lib/chessHelpers';
 
-export default function GameInfo({ status, turn, onReset }: GameInfoProps) {
+export default function GameInfo({ game }: { game: Chess }) {
+  const latestMove = game.history().at(-1) ?? 'Ingen træk endnu';
+
   return (
-    <section className="panel">
-      <h2>Partiinfo</h2>
-      <p>
-        <strong>Status:</strong> {status}
-      </p>
-      <p>
-        <strong>Tur:</strong> {turn}
-      </p>
-      <button className="reset-btn" onClick={onReset} type="button">
-        Nyt parti
-      </button>
-    </section>
+    <div className="panel">
+      <h2>Status</h2>
+      <div className="infoGrid">
+        <div className="infoRow">
+          <span>Parti</span>
+          <strong>{getGameStatus(game)}</strong>
+        </div>
+        <div className="infoRow">
+          <span>Tur</span>
+          <strong>{getTurnLabel(game)}</strong>
+        </div>
+        <div className="infoRow">
+          <span>Seneste træk</span>
+          <strong>{latestMove}</strong>
+        </div>
+      </div>
+    </div>
   );
 }

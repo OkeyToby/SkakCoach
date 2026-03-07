@@ -1,72 +1,61 @@
-/// <reference lib="webworker" />
-
-type EngineRequest = {
-  type: 'bestmove' | 'evaluate';
-  requestId: string;
-  fen: string;
-  depth?: number;
+export type EngineSnapshot = {
+  bestMove: string;
+  evaluation: number | null;
 };
 
-type WorkerResponse = {
-  requestId: string;
-  bestMove?: string;
-  scoreCp?: number;
-  scoreMate?: number;
-  pv?: string;
-};
-
-const ctx = self as DedicatedWorkerGlobalScope;
-ctx.importScripts('https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish.js');
-
-const StockfishConstructor = (ctx as unknown as { STOCKFISH: () => Worker }).STOCKFISH;
-const engine = StockfishConstructor();
-
-let activeRequest: EngineRequest | null = null;
-let lastScoreCp: number | undefined;
-let lastScoreMate: number | undefined;
-let lastPv: string | undefined;
-
-engine.onmessage = (raw: MessageEvent | string) => {
-  const message = typeof raw === 'string' ? raw : raw.data;
-  if (!activeRequest) return;
-
-  if (message.startsWith('info') && message.includes(' score ')) {
-    const cpMatch = message.match(/score cp (-?\d+)/);
-    const mateMatch = message.match(/score mate (-?\d+)/);
-    const pvMatch = message.match(/ pv (.+)$/);
-
-    if (cpMatch) lastScoreCp = Number(cpMatch[1]);
-    if (mateMatch) lastScoreMate = Number(mateMatch[1]);
-    if (pvMatch) lastPv = pvMatch[1];
-  }
-
-  if (message.startsWith('bestmove')) {
-    const bestMove = message.split(' ')[1];
-    const payload: WorkerResponse = {
-      requestId: activeRequest.requestId,
-      bestMove,
-      scoreCp: lastScoreCp,
-      scoreMate: lastScoreMate,
-      pv: lastPv,
+export type ParsedEngineLine =
+  | {
+      kind: 'ready';
+    }
+  | {
+      kind: 'evaluation';
+      evaluation: number;
+    }
+  | {
+      kind: 'bestmove';
+      bestMove: string;
     };
-    ctx.postMessage(payload);
-    activeRequest = null;
-  }
+
+export const EMPTY_ENGINE_SNAPSHOT: EngineSnapshot = {
+  bestMove: '',
+  evaluation: null,
 };
 
-function runRequest(request: EngineRequest) {
-  activeRequest = request;
-  lastScoreCp = undefined;
-  lastScoreMate = undefined;
-  lastPv = undefined;
-
-  engine.postMessage('ucinewgame');
-  engine.postMessage(`position fen ${request.fen}`);
-  engine.postMessage(`go depth ${request.depth ?? 12}`);
+function mateToEvaluation(mate: number): number {
+  const magnitude = Math.max(1000, 100000 - Math.abs(mate) * 1000);
+  return mate > 0 ? magnitude : -magnitude;
 }
 
-ctx.onmessage = (event: MessageEvent<EngineRequest>) => {
-  runRequest(event.data);
-};
+export function parseEngineLine(rawLine: string): ParsedEngineLine | null {
+  const line = rawLine.trim();
+  if (!line) return null;
 
-export {};
+  if (line === 'readyok') {
+    return { kind: 'ready' };
+  }
+
+  const mateMatch = line.match(/score mate (-?\d+)/);
+  if (mateMatch) {
+    return {
+      kind: 'evaluation',
+      evaluation: mateToEvaluation(Number(mateMatch[1])),
+    };
+  }
+
+  const cpMatch = line.match(/score cp (-?\d+)/);
+  if (cpMatch) {
+    return {
+      kind: 'evaluation',
+      evaluation: Number(cpMatch[1]),
+    };
+  }
+
+  if (line.startsWith('bestmove')) {
+    return {
+      kind: 'bestmove',
+      bestMove: line.split(/\s+/)[1] ?? '',
+    };
+  }
+
+  return null;
+}

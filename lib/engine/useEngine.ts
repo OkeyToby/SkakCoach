@@ -1,68 +1,120 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  EMPTY_ENGINE_SNAPSHOT,
+  type EngineSnapshot,
+  parseEngineLine,
+} from './stockfishWorker';
 
-export type EngineResult = {
-  bestMove?: string;
-  scoreCp?: number;
-  scoreMate?: number;
-  pv?: string;
-};
-
-type PendingRequest = {
-  resolve: (value: EngineResult) => void;
+type PendingAnalysis = {
+  snapshot: EngineSnapshot;
+  resolve: (value: EngineSnapshot) => void;
   reject: (reason?: unknown) => void;
 };
 
 export function useEngine() {
   const workerRef = useRef<Worker | null>(null);
-  const pendingRef = useRef<Map<string, PendingRequest>>(new Map());
+  const readyPromiseRef = useRef<Promise<void> | null>(null);
+  const resolveReadyRef = useRef<(() => void) | null>(null);
+  const pendingRef = useRef<PendingAnalysis | null>(null);
+  const [bestMove, setBestMove] = useState('');
+  const [evaluation, setEvaluation] = useState<number | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const worker = new Worker(new URL('./stockfishWorker.ts', import.meta.url));
+    readyPromiseRef.current = new Promise((resolve) => {
+      resolveReadyRef.current = resolve;
+    });
+
+    const worker = new Worker('/stockfish/stockfish.js');
     workerRef.current = worker;
 
-    worker.onmessage = (event: MessageEvent<EngineResult & { requestId: string }>) => {
-      const { requestId, ...result } = event.data;
-      const pending = pendingRef.current.get(requestId);
-      if (!pending) return;
-      pendingRef.current.delete(requestId);
-      pending.resolve(result);
+    worker.onmessage = (event: MessageEvent<string>) => {
+      const parsed = parseEngineLine(String(event.data));
+      if (!parsed) return;
+
+      if (parsed.kind === 'ready') {
+        setIsReady(true);
+        resolveReadyRef.current?.();
+        resolveReadyRef.current = null;
+        return;
+      }
+
+      if (parsed.kind === 'evaluation') {
+        setEvaluation(parsed.evaluation);
+        if (pendingRef.current) {
+          pendingRef.current.snapshot.evaluation = parsed.evaluation;
+        }
+        return;
+      }
+
+      setBestMove(parsed.bestMove);
+      if (pendingRef.current) {
+        pendingRef.current.snapshot.bestMove = parsed.bestMove;
+        pendingRef.current.resolve({ ...pendingRef.current.snapshot });
+        pendingRef.current = null;
+      }
     };
 
     worker.onerror = (error) => {
-      pendingRef.current.forEach((pending) => pending.reject(error));
-      pendingRef.current.clear();
+      if (pendingRef.current) {
+        pendingRef.current.reject(error);
+        pendingRef.current = null;
+      }
     };
 
+    worker.postMessage('uci');
+    worker.postMessage('setoption name UCI_AnalyseMode value true');
+    worker.postMessage('isready');
+
     return () => {
+      if (pendingRef.current) {
+        pendingRef.current.reject(new Error('Engine afsluttet.'));
+        pendingRef.current = null;
+      }
       worker.terminate();
+      workerRef.current = null;
     };
   }, []);
 
-  function sendRequest(type: 'bestmove' | 'evaluate', fen: string, depth = 12): Promise<EngineResult> {
+  async function analyzeFen(fen: string, depth = 12): Promise<EngineSnapshot> {
+    if (!workerRef.current || !readyPromiseRef.current) {
+      throw new Error('Engine ikke klar.');
+    }
+
+    await readyPromiseRef.current;
+    setBestMove('');
+    setEvaluation(null);
+
+    if (pendingRef.current) {
+      pendingRef.current.reject(new Error('Engine er allerede i gang med en analyse.'));
+      pendingRef.current = null;
+    }
+
     return new Promise((resolve, reject) => {
       const worker = workerRef.current;
       if (!worker) {
         reject(new Error('Engine ikke klar.'));
         return;
       }
-      const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      pendingRef.current.set(requestId, { resolve, reject });
-      worker.postMessage({ type, requestId, fen, depth });
+
+      pendingRef.current = {
+        snapshot: { ...EMPTY_ENGINE_SNAPSHOT },
+        resolve,
+        reject,
+      };
+
+      worker.postMessage('ucinewgame');
+      worker.postMessage(`position fen ${fen}`);
+      worker.postMessage(`go depth ${depth}`);
     });
   }
 
-  async function getBestMove(fen: string, depth = 12) {
-    return sendRequest('bestmove', fen, depth);
-  }
-
-  async function evaluatePosition(fen: string, depth = 10) {
-    return sendRequest('evaluate', fen, depth);
-  }
-
   return {
-    getBestMove,
-    evaluatePosition,
+    bestMove,
+    evaluation,
+    analyzeFen,
+    isReady,
   };
 }

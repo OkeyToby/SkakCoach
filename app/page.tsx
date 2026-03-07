@@ -1,113 +1,137 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Chess } from 'chess.js';
 import ChessBoard from '@/components/ChessBoard';
 import CoachPanel from '@/components/CoachPanel';
 import GameInfo from '@/components/GameInfo';
 import MoveHistory from '@/components/MoveHistory';
 import { explainMove, type MoveExplanation } from '@/lib/explainMove';
-import { getGameStatus } from '@/lib/chessHelpers';
+import { applyUciMove, uciToSan } from '@/lib/chessHelpers';
 import { useEngine } from '@/lib/engine/useEngine';
 
 const defaultExplanation: MoveExplanation = {
-  advantage: 'Start med at tage centrum og udvikle springere/løbere.',
-  disadvantage: 'Undgå tidlige bondetræk i kanten, hvis de ikke har et klart formål.',
-  betterOption: 'Klassiske åbningstræk som e4, d4, Nf3 eller Nc3 er gode at overveje.',
+  advantage: 'Spil dit første træk og prøv at sætte en officer i gang.',
+  drawback: 'Ingen vurdering endnu.',
+  betterMove: 'Kæmp gerne om centrum tidligt og tænk på rokade.',
 };
 
-export default function HomePage() {
-  const [chess, setChess] = useState(() => new Chess());
-  const [moves, setMoves] = useState<string[]>([]);
+function playFallbackReply(game: Chess) {
+  const replies = game.moves({ verbose: true });
+  if (replies.length === 0) return;
+
+  const reply = replies[Math.floor(Math.random() * replies.length)];
+  game.move({
+    from: reply.from,
+    to: reply.to,
+    promotion: reply.promotion ?? 'q',
+  });
+}
+
+export default function Page() {
+  const [game, setGame] = useState(() => new Chess());
   const [coachText, setCoachText] = useState<MoveExplanation>(defaultExplanation);
-  const [isBusy, setIsBusy] = useState(false);
-  const { getBestMove, evaluatePosition } = useEngine();
+  const [isComputerThinking, setIsComputerThinking] = useState(false);
+  const { analyzeFen, isReady } = useEngine();
 
-  const status = useMemo(() => getGameStatus(chess), [chess]);
-  const turn = chess.turn() === 'w' ? 'Hvid (dig)' : 'Sort (computer)';
+  async function onPlayerMove(from: string, to: string) {
+    if (!isReady || isComputerThinking || game.turn() !== 'w' || game.isGameOver()) return false;
 
-  const makeComputerMove = async (game: Chess) => {
-    const result = await getBestMove(game.fen(), 12);
-    if (!result.bestMove || result.bestMove === '(none)') return;
-    game.move({ from: result.bestMove.slice(0, 2), to: result.bestMove.slice(2, 4), promotion: 'q' });
-  };
-
-  const onPieceDrop = async (source: string, target: string) => {
-    if (isBusy || chess.turn() !== 'w' || chess.isGameOver()) return false;
-
-    const before = new Chess(chess.fen());
-    const next = new Chess(chess.fen());
-    const move = next.move({ from: source, to: target, promotion: 'q' });
-    if (!move) return false;
-
-    setIsBusy(true);
+    const before = new Chess(game.fen());
+    const afterPlayerMove = new Chess(game.fen());
+    let move = null;
 
     try {
-      const [evalBefore, evalAfter, bestForWhite] = await Promise.all([
-        evaluatePosition(before.fen(), 10),
-        evaluatePosition(next.fen(), 10),
-        getBestMove(before.fen(), 12),
-      ]);
+      move = afterPlayerMove.move({ from, to, promotion: 'q' });
+    } catch {
+      move = null;
+    }
 
-      const bestSan = bestForWhite.bestMove
-        ? before.move({
-            from: bestForWhite.bestMove.slice(0, 2),
-            to: bestForWhite.bestMove.slice(2, 4),
-            promotion: 'q',
-          })?.san
-        : undefined;
+    if (!move) return false;
 
-      if (bestForWhite.bestMove) {
-        before.undo();
+    setIsComputerThinking(true);
+
+    try {
+      const beforeAnalysis = await analyzeFen(before.fen(), 12);
+      const afterAnalysis = await analyzeFen(afterPlayerMove.fen(), 12);
+
+      setCoachText(
+        explainMove({
+          move,
+          before,
+          after: afterPlayerMove,
+          history: before.history(),
+          engineBestMoveSan: uciToSan(before, beforeAnalysis.bestMove),
+          evalBeforeCp: beforeAnalysis.evaluation,
+          evalAfterCp: afterAnalysis.evaluation,
+        }),
+      );
+
+      if (!afterPlayerMove.isGameOver() && afterAnalysis.bestMove) {
+        applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
       }
 
-      const explanation = explainMove({
-        before,
-        after: next,
-        moveSan: move.san,
-        engineBestMoveSan: bestSan,
-        evalBeforeCp: evalBefore.scoreCp,
-        evalAfterCp: evalAfter.scoreCp,
-      });
-
-      if (!next.isGameOver()) {
-        await makeComputerMove(next);
-      }
-
-      setChess(next);
-      setCoachText(explanation);
-      setMoves(next.history());
+      setGame(afterPlayerMove);
       return true;
     } catch {
+      if (!afterPlayerMove.isGameOver()) {
+        playFallbackReply(afterPlayerMove);
+      }
+
+      setCoachText(
+        explainMove({
+          move,
+          before,
+          after: afterPlayerMove,
+          history: before.history(),
+        }),
+      );
+      setGame(afterPlayerMove);
       return false;
     } finally {
-      setIsBusy(false);
+      setIsComputerThinking(false);
     }
-  };
+  }
 
-  const onReset = () => {
-    const fresh = new Chess();
-    setChess(fresh);
-    setMoves([]);
+  function resetGame() {
+    setGame(new Chess());
     setCoachText(defaultExplanation);
-    setIsBusy(false);
-  };
+    setIsComputerThinking(false);
+  }
 
   return (
-    <main className="page-wrap">
-      <h1>SkakCoach</h1>
-      <p className="intro">Spil hvid mod computeren og få letforståelig feedback efter hvert træk.</p>
-      <div className="layout">
-        <section>
-          <ChessBoard position={chess.fen()} onPieceDrop={onPieceDrop} />
-          {isBusy && <p className="thinking">Computeren tænker…</p>}
-        </section>
-        <aside className="side-col">
-          <CoachPanel explanation={coachText} />
-          <GameInfo status={status} turn={turn} onReset={onReset} />
-          <MoveHistory moves={moves} />
-        </aside>
-      </div>
+    <main className="page">
+      <section className="boardColumn">
+        <div className="hero">
+          <p className="eyebrow">Skaktræning på dansk</p>
+          <h1>SkakCoach</h1>
+          <p className="intro">
+            Spil med de hvide brikker mod computeren og få korte forklaringer efter hvert træk.
+          </p>
+        </div>
+
+        <div className="boardPanel">
+          <ChessBoard
+            position={game.fen()}
+            onMove={onPlayerMove}
+            disabled={!isReady || isComputerThinking || game.turn() !== 'w' || game.isGameOver()}
+          />
+
+          <div className="boardMeta">
+            <button className="resetBtn" onClick={resetGame} type="button">
+              Nyt parti
+            </button>
+            {!isReady && <p className="statusNote">Stockfish starter…</p>}
+            {isComputerThinking && <p className="thinking">Computeren tænker…</p>}
+          </div>
+        </div>
+      </section>
+
+      <aside className="sideColumn">
+        <GameInfo game={game} />
+        <CoachPanel {...coachText} />
+        <MoveHistory moves={game.history()} />
+      </aside>
     </main>
   );
 }
