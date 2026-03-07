@@ -1,13 +1,27 @@
 type Props = {
+  classification: string;
   advantage: string;
   drawback: string;
   betterMove: string;
 };
 
-export default function CoachPanel({ advantage, drawback, betterMove }: Props) {
+function getClassificationClass(classification: string): string {
+  if (classification === 'Stor fejl') return 'coachBadge coachBadgeBad';
+  if (classification === 'Fejl') return 'coachBadge coachBadgeWarn';
+  if (classification === 'Upræcist' || classification === 'Afventer træk') {
+    return 'coachBadge coachBadgeNote';
+  }
+  return 'coachBadge coachBadgeGood';
+}
+
+export default function CoachPanel({ classification, advantage, drawback, betterMove }: Props) {
   return (
     <div className="panel">
       <h2>SkakCoach</h2>
+      <div className="coachSummary">
+        <span>Vurdering</span>
+        <strong className={getClassificationClass(classification)}>{classification}</strong>
+      </div>
 
       <div className="coachBox coachBoxPositive">
         <h3>Fordel ved dit træk</h3>

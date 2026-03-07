@@ -10,6 +10,7 @@ import {
 } from './chessHelpers';
 
 export type MoveExplanation = {
+  classification: string;
   advantage: string;
   drawback: string;
   betterMove: string;
@@ -61,6 +62,13 @@ function describeEngineIdea(before: Chess, engineBestMoveSan: string): string {
   return `${engineBestMoveSan} var stærkere, fordi det giver dig en mere aktiv plan.`;
 }
 
+function classifyMove(evalDrop: number): string {
+  if (evalDrop > 220) return 'Stor fejl';
+  if (evalDrop > 110) return 'Fejl';
+  if (evalDrop > 60) return 'Upræcist';
+  return 'Godt træk';
+}
+
 export function explainMove(input: ExplainInput): MoveExplanation {
   const { move, before, after, history, engineBestMoveSan, evalBeforeCp, evalAfterCp } = input;
   const moveNumber = history.length + 1;
@@ -81,6 +89,7 @@ export function explainMove(input: ExplainInput): MoveExplanation {
     typeof evalBeforeCp === 'number' && typeof evalAfterCp === 'number'
       ? evalBeforeCp - evalAfterCp
       : 0;
+  const classification = classifyMove(evalDrop);
 
   let advantage = 'Dit træk holder stillingen i gang, men uden en stor ændring endnu.';
   if (materialAfter > materialBefore) {
@@ -134,6 +143,7 @@ export function explainMove(input: ExplainInput): MoveExplanation {
   }
 
   return {
+    classification,
     advantage,
     drawback,
     betterMove,

@@ -11,6 +11,7 @@ import { applyUciMove, uciToSan } from '@/lib/chessHelpers';
 import { useEngine } from '@/lib/engine/useEngine';
 
 const defaultExplanation: MoveExplanation = {
+  classification: 'Afventer træk',
   advantage: 'Spil dit første træk og prøv at sætte en officer i gang.',
   drawback: 'Ingen vurdering endnu.',
   betterMove: 'Kæmp gerne om centrum tidligt og tænk på rokade.',

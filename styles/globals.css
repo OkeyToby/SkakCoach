@@ -92,6 +92,50 @@ h1 {
   font-size: 1.05rem;
 }
 
+.coachSummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8f8f6;
+}
+
+.coachSummary span {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.coachBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.coachBadgeGood {
+  background: #e7f7ec;
+  color: #166534;
+}
+
+.coachBadgeNote {
+  background: #fff7db;
+  color: #8a5b00;
+}
+
+.coachBadgeWarn {
+  background: #fdebd2;
+  color: #9a3412;
+}
+
+.coachBadgeBad {
+  background: #fdeaea;
+  color: #b91c1c;
+}
+
 .infoGrid {
   display: grid;
   gap: 10px;
