@@ -19,6 +19,11 @@ button {
   font: inherit;
 }
 
+select,
+input {
+  font: inherit;
+}
+
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
@@ -184,6 +189,45 @@ h1 {
   color: #b91c1c;
 }
 
+.evalPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.evalHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.evalHeader h2 {
+  margin-bottom: 0;
+}
+
+.evalBar {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 220px;
+  border-radius: 18px;
+  background: #111827;
+  border: 1px solid rgba(31, 41, 55, 0.12);
+}
+
+.evalBarWhite {
+  position: absolute;
+  inset: auto 0 0;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  transition: height 220ms ease;
+}
+
+.evalHint {
+  margin: 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
 .infoGrid {
   display: grid;
   gap: 10px;
@@ -239,6 +283,45 @@ h1 {
   background: #111827;
   border-color: #111827;
   color: #fff;
+}
+
+.settingsGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.settingField {
+  display: grid;
+  gap: 6px;
+}
+
+.settingField span {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.settingField select {
+  width: 100%;
+  border: 1px solid #d6d3d1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.toggleList {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.toggleRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.toggleRow span {
+  line-height: 1.4;
 }
 
 .coachBox {
@@ -322,6 +405,19 @@ h1 {
 
 .emptyMove {
   color: #6b7280;
+}
+
+@keyframes moveBlink {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
+
+  50% {
+    transform: scale(1.02);
+    filter: saturate(1.2);
+  }
 }
 
 @media (max-width: 900px) {

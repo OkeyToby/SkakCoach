@@ -28,8 +28,10 @@ export type ExplainInput = {
   before: Chess;
   after: Chess;
   history: string[];
+  historyVerbose?: Move[];
   playerColor: Color;
   engineBestMoveSan?: string;
+  opponentBestReplySan?: string;
   evalBeforeCp?: number | null;
   evalAfterCp?: number | null;
 };
@@ -43,6 +45,61 @@ export type PreMoveInput = {
 function getPerspectiveScore(score: number | null | undefined, playerColor: Color): number | undefined {
   if (typeof score !== 'number') return undefined;
   return playerColor === 'w' ? score : -score;
+}
+
+function normalizeSan(san: string): string {
+  return san.replace(/[+#?!]/g, '');
+}
+
+function getOpeningPlan(history: string[], playerColor: Color): string | null {
+  const moves = history.map(normalizeSan);
+  const first = moves[0];
+  const second = moves[1];
+
+  if (first === 'e4' && second === 'e5' && moves.includes('Bc4')) {
+    return 'Det ligner Italiensk åbning. Typisk følger Sf3, hurtig rokade og pres i centrum med c3 eller d4.';
+  }
+
+  if (first === 'e4' && second === 'e5' && moves.includes('Bb5')) {
+    return 'Det ligner Spansk åbning. Fortsæt med udvikling, rokade og pres mod centrum.';
+  }
+
+  if (first === 'e4' && second === 'c5') {
+    return playerColor === 'w'
+      ? 'Du møder Siciliansk. Typisk er Sf3 og d4 den aktive plan.'
+      : 'Du vælger Siciliansk. Typisk følger ...d6, ...Sf6 og kamp om d4.';
+  }
+
+  if (first === 'e4' && second === 'c6') {
+    return 'Det ligner Caro-Kann. Hold centrum sundt og udvikl officererne roligt.';
+  }
+
+  if (first === 'd4' && second === 'd5' && moves.includes('c4')) {
+    return 'Det ligner Dronningegambit. Planen er ofte udvikling med Sf3, Sc3 og langsomt pres i centrum.';
+  }
+
+  return null;
+}
+
+function isRepeatedPieceMove(move: Move, historyVerbose: Move[], playerColor: Color): boolean {
+  if (historyVerbose.length === 0) return false;
+
+  return historyVerbose.some(
+    (entry) => entry.color === playerColor && entry.piece === move.piece && entry.to === move.from,
+  );
+}
+
+function describeOpponentTactic(opponentBestReplySan?: string): string | null {
+  if (!opponentBestReplySan) return null;
+  if (opponentBestReplySan.includes('+')) {
+    return `Du overser en taktisk mulighed for modstanderen, fx ${opponentBestReplySan}, som giver skak og presser din stilling.`;
+  }
+
+  if (opponentBestReplySan.includes('x')) {
+    return `Du overser et konkret modsvar, fx ${opponentBestReplySan}, der ser ud til at vinde materiale.`;
+  }
+
+  return `Modstanderen får et stærkt modsvar, fx ${opponentBestReplySan}, som forbedrer deres spil mærkbart.`;
 }
 
 function describeEngineIdea(before: Chess, engineBestMoveSan: string, playerColor: Color): string {
@@ -92,8 +149,22 @@ function classifyMove(evalDrop: number): string {
 }
 
 export function explainMove(input: ExplainInput): MoveExplanation {
-  const { move, before, after, history, playerColor, engineBestMoveSan, evalBeforeCp, evalAfterCp } = input;
+  const {
+    move,
+    before,
+    after,
+    history,
+    historyVerbose = [],
+    playerColor,
+    engineBestMoveSan,
+    opponentBestReplySan,
+    evalBeforeCp,
+    evalAfterCp,
+  } = input;
   const moveNumber = history.length + 1;
+  const fullHistory = [...history, move.san];
+  const openingPlan = getOpeningPlan(fullHistory, playerColor);
+  const repeatedPieceMove = moveNumber <= 12 && isRepeatedPieceMove(move, historyVerbose, playerColor);
 
   const centerBefore = countCenterControl(before, playerColor);
   const centerAfter = countCenterControl(after, playerColor);
@@ -133,6 +204,8 @@ export function explainMove(input: ExplainInput): MoveExplanation {
     advantage = 'Fint træk: du kæmper om centrum, og det er ofte nøglen til en god stilling.';
   } else if (move.piece === 'p' && (move.to === 'e4' || move.to === 'd4' || move.to === 'e5' || move.to === 'd5')) {
     advantage = 'God plan: bonden tager plads i centrum og giver dine brikker bedre felter.';
+  } else if (openingPlan && moveNumber <= 6) {
+    advantage = `Du følger en sund åbningsidé. ${openingPlan}`;
   } else if (evalDrop < -60) {
     advantage = 'Engine kan godt lide idéen: du holder tryk og gør stillingen mere behagelig.';
   }
@@ -141,11 +214,21 @@ export function explainMove(input: ExplainInput): MoveExplanation {
   if (hangingAfter > hangingBefore) {
     drawback = 'Pas på: du efterlader en brik uden nok støtte.';
   } else if (evalDrop > 220) {
-    drawback = 'Du overser en taktisk mulighed hos modstanderen, og stillingen glider hurtigt.';
+    drawback =
+      describeOpponentTactic(opponentBestReplySan) ??
+      'Du overser en taktisk mulighed hos modstanderen, og stillingen glider hurtigt.';
+  } else if (evalDrop > 160) {
+    drawback =
+      describeOpponentTactic(opponentBestReplySan) ??
+      'Det her giver modstanderen en meget konkret mulighed for at overtage initiativet.';
   } else if (evalDrop > 110) {
     drawback = 'Det træk giver modstanderen bedre spil og du mister noget kontrol.';
   } else if (evalDrop > 60) {
     drawback = 'Trækket er spilbart, men modstanderen får lidt nemmere spil.';
+  } else if (evalDrop > 20) {
+    drawback = 'Der var en lidt mere præcis måde at holde presset på i stillingen.';
+  } else if (repeatedPieceMove) {
+    drawback = 'Du bruger et ekstra tempo på den samme brik i stedet for at få flere brikker med i spil.';
   } else if (moveNumber <= 10 && move.piece === 'q') {
     drawback = 'Tidlig dronningeudvikling kan koste tempo, fordi modstanderen kan angribe den og udvikle sig samtidig.';
   } else if (move.piece === 'p' && ['f3', 'f4', 'f5', 'f6'].includes(move.to)) {
@@ -159,8 +242,15 @@ export function explainMove(input: ExplainInput): MoveExplanation {
   let betterMove = 'Overvej et træk der udvikler en officer, kæmper om centrum eller hjælper dig med at rokere.';
   if (engineBestMoveSan) {
     betterMove = describeEngineIdea(before, engineBestMoveSan, playerColor);
+    if (openingPlan && moveNumber <= 8) {
+      betterMove = `${betterMove} ${openingPlan}`;
+    }
+  } else if (repeatedPieceMove) {
+    betterMove = 'Det var ofte bedre at udvikle en ny brik i stedet for at flytte den samme igen.';
   } else if (hangingAfter > hangingBefore) {
     betterMove = 'En bedre mulighed var at dække din udsatte brik først og holde stillingen samlet.';
+  } else if (openingPlan && moveNumber <= 8) {
+    betterMove = openingPlan;
   } else if (!hasCastled(after, playerColor) && moveNumber >= 8) {
     betterMove = 'Tænk på kongesikkerhed nu: en udvikling mod hurtig rokade ville ofte være sundere.';
   } else if (devAfter === devBefore) {
@@ -179,6 +269,7 @@ export function explainMove(input: ExplainInput): MoveExplanation {
 
 export function buildPreMoveCoach(input: PreMoveInput): PreMoveCoach {
   const { position, playerColor, suggestedMoves } = input;
+  const openingPlan = getOpeningPlan(position.history(), playerColor);
 
   const developedPieces = countDevelopedMinorPieces(position, playerColor);
   const centerControl = countCenterControl(position, playerColor);
@@ -201,6 +292,10 @@ export function buildPreMoveCoach(input: PreMoveInput): PreMoveCoach {
     plan = 'Fortsat udvikling er vigtigere end passive ventetræk her.';
   } else {
     plan = 'Se efter aktive træk mod centrum eller modstanderens konge.';
+  }
+
+  if (openingPlan && position.history().length <= 8) {
+    plan = openingPlan;
   }
 
   let caution = 'Undgå passive træk, der ikke forbedrer dine brikker.';

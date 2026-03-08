@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Chessboard } from 'react-chessboard';
 
 type Props = {
@@ -8,6 +8,10 @@ type Props = {
   onMove: (from: string, to: string) => Promise<boolean> | boolean;
   boardOrientation?: 'white' | 'black';
   disabled?: boolean;
+  darkSquareColor?: string;
+  lightSquareColor?: string;
+  customSquareStyles?: Record<string, CSSProperties>;
+  showBoardNotation?: boolean;
 };
 
 export default function ChessBoard({
@@ -15,6 +19,10 @@ export default function ChessBoard({
   onMove,
   boardOrientation = 'white',
   disabled = false,
+  darkSquareColor = '#8ea1b5',
+  lightSquareColor = '#f3efe6',
+  customSquareStyles,
+  showBoardNotation = true,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [boardWidth, setBoardWidth] = useState(560);
@@ -40,8 +48,10 @@ export default function ChessBoard({
         boardOrientation={boardOrientation}
         boardWidth={boardWidth}
         arePiecesDraggable={!disabled}
-        customDarkSquareStyle={{ backgroundColor: '#8ea1b5' }}
-        customLightSquareStyle={{ backgroundColor: '#f3efe6' }}
+        customDarkSquareStyle={{ backgroundColor: darkSquareColor }}
+        customLightSquareStyle={{ backgroundColor: lightSquareColor }}
+        customSquareStyles={customSquareStyles}
+        showBoardNotation={showBoardNotation}
         onPieceDrop={(sourceSquare, targetSquare) => {
           if (!targetSquare || disabled) return false;
           void onMove(sourceSquare, targetSquare);

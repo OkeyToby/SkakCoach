@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Chess, type Color } from 'chess.js';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { Chess, type Color, type Move } from 'chess.js';
 import ChessBoard from '@/components/ChessBoard';
 import CoachPanel from '@/components/CoachPanel';
+import EvalBar from '@/components/EvalBar';
 import GameInfo from '@/components/GameInfo';
 import MoveHistory from '@/components/MoveHistory';
+import SettingsPanel from '@/components/SettingsPanel';
 import {
   buildPreMoveCoach,
   explainMove,
@@ -16,6 +18,54 @@ import { applyUciMove, uciToSan } from '@/lib/chessHelpers';
 import { useEngine } from '@/lib/engine/useEngine';
 
 type PlayerSideChoice = 'white' | 'black' | 'random';
+type Difficulty = 'let' | 'mellem' | 'svaer';
+type Tempo = 'hurtig' | 'normal' | 'rolig';
+type BoardThemeKey = 'classic' | 'forest' | 'ocean';
+type StoredSettings = {
+  difficulty: Difficulty;
+  tempo: Tempo;
+  theme: BoardThemeKey;
+  showEvalBar: boolean;
+  showCoordinates: boolean;
+};
+
+const SETTINGS_KEY = 'skakcoach-settings';
+
+const difficultyDepth: Record<Difficulty, number> = {
+  let: 8,
+  mellem: 12,
+  svaer: 15,
+};
+
+const tempoDelay: Record<Tempo, number> = {
+  hurtig: 250,
+  normal: 600,
+  rolig: 1200,
+};
+
+const boardThemes: Record<
+  BoardThemeKey,
+  { light: string; dark: string; highlight: string; outline: string }
+> = {
+  classic: {
+    light: '#f3efe6',
+    dark: '#8ea1b5',
+    highlight: 'rgba(246, 246, 105, 0.82)',
+    outline: '#c18b1d',
+  },
+  forest: {
+    light: '#edf2e3',
+    dark: '#5f7d5c',
+    highlight: 'rgba(152, 243, 169, 0.78)',
+    outline: '#2e5f34',
+  },
+  ocean: {
+    light: '#eef5fb',
+    dark: '#5d84b6',
+    highlight: 'rgba(121, 202, 255, 0.78)',
+    outline: '#1f5f99',
+  },
+};
 
 const defaultExplanation: MoveExplanation = {
   classification: 'Afventer træk',
@@ -32,12 +82,12 @@ function resolvePlayerColor(choice: PlayerSideChoice): Color {
   return choice === 'white' ? 'w' : 'b';
 }
 
-function playFallbackReply(game: Chess) {
+function playFallbackReply(game: Chess): Move | null {
   const replies = game.moves({ verbose: true });
-  if (replies.length === 0) return;
+  if (replies.length === 0) return null;
 
   const reply = replies[Math.floor(Math.random() * replies.length)];
-  game.move({
+  return game.move({
     from: reply.from,
     to: reply.to,
     promotion: reply.promotion ?? 'q',
@@ -98,6 +148,21 @@ function extractSuggestedMoves(
     .filter((move): move is string => Boolean(move));
 }
 
+function isStoredSettings(value: unknown): value is StoredSettings {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Partial<StoredSettings>;
+  return (
+    (candidate.difficulty === 'let' ||
+      candidate.difficulty === 'mellem' ||
+      candidate.difficulty === 'svaer') &&
+    (candidate.tempo === 'hurtig' || candidate.tempo === 'normal' || candidate.tempo === 'rolig') &&
+    (candidate.theme === 'classic' || candidate.theme === 'forest' || candidate.theme === 'ocean') &&
+    typeof candidate.showEvalBar === 'boolean' &&
+    typeof candidate.showCoordinates === 'boolean'
+  );
+}
+
 export default function Page() {
   const [game, setGame] = useState(() => new Chess());
   const [coachText, setCoachText] = useState<MoveExplanation>(defaultExplanation);
@@ -106,9 +171,70 @@ export default function Page() {
   const [isPreparingCoach, setIsPreparingCoach] = useState(false);
   const [playerSideChoice, setPlayerSideChoice] = useState<PlayerSideChoice>('white');
   const [playerColor, setPlayerColor] = useState<Color>('w');
+  const [currentEvaluation, setCurrentEvaluation] = useState<number | null>(null);
+  const [lastEngineMove, setLastEngineMove] = useState<[string, string] | null>(null);
+  const [difficulty, setDifficulty] = useState<Difficulty>('mellem');
+  const [tempo, setTempo] = useState<Tempo>('normal');
+  const [theme, setTheme] = useState<BoardThemeKey>('classic');
+  const [showEvalBar, setShowEvalBar] = useState(true);
+  const [showCoordinates, setShowCoordinates] = useState(true);
+  const settingsLoadedRef = useRef(false);
   const coachFenRef = useRef('');
   const computerFenRef = useRef('');
   const { analyzeFen, isReady } = useEngine();
+
+  const boardTheme = boardThemes[theme];
+  const analysisDepth = difficultyDepth[difficulty];
+  const moveDelay = tempoDelay[tempo];
+  const lastEngineMoveStyles: Record<string, CSSProperties> =
+    lastEngineMove === null
+      ? {}
+      : {
+          [lastEngineMove[0]]: {
+            backgroundColor: boardTheme.highlight,
+            boxShadow: `inset 0 0 0 3px ${boardTheme.outline}`,
+            animation: 'moveBlink 0.9s ease-in-out 2',
+          },
+          [lastEngineMove[1]]: {
+            backgroundColor: boardTheme.highlight,
+            boxShadow: `inset 0 0 0 3px ${boardTheme.outline}`,
+            animation: 'moveBlink 0.9s ease-in-out 2',
+          },
+        };
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!isStoredSettings(parsed)) return;
+
+      setDifficulty(parsed.difficulty);
+      setTempo(parsed.tempo);
+      setTheme(parsed.theme);
+      setShowEvalBar(parsed.showEvalBar);
+      setShowCoordinates(parsed.showCoordinates);
+    } catch {
+      // Ignore malformed local settings and keep defaults.
+    } finally {
+      settingsLoadedRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoadedRef.current) return;
+
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        difficulty,
+        tempo,
+        theme,
+        showEvalBar,
+        showCoordinates,
+      } satisfies StoredSettings),
+    );
+  }, [difficulty, showCoordinates, showEvalBar, tempo, theme]);
 
   useEffect(() => {
     if (!isReady || isComputerThinking) return;
@@ -137,19 +263,33 @@ export default function Page() {
         const next = new Chess(currentFen);
 
         try {
-          const analysis = await analyzeFen(currentFen, 12);
+          const analysis = await analyzeFen(currentFen, analysisDepth);
           if (cancelled) return;
 
           if (analysis.bestMove) {
-            await delay(600);
+            await delay(moveDelay);
             if (cancelled) return;
-            applyUciMove(next, analysis.bestMove);
+            const applied = applyUciMove(next, analysis.bestMove);
+            if (applied) {
+              setLastEngineMove([applied.from, applied.to]);
+            } else {
+              const fallback = playFallbackReply(next);
+              if (fallback) {
+                setLastEngineMove([fallback.from, fallback.to]);
+              }
+            }
           } else {
-            playFallbackReply(next);
+            const fallback = playFallbackReply(next);
+            if (fallback) {
+              setLastEngineMove([fallback.from, fallback.to]);
+            }
           }
         } catch {
           if (cancelled) return;
-          playFallbackReply(next);
+          const fallback = playFallbackReply(next);
+          if (fallback) {
+            setLastEngineMove([fallback.from, fallback.to]);
+          }
         } finally {
           if (!cancelled) {
             computerFenRef.current = '';
@@ -174,9 +314,10 @@ export default function Page() {
 
     void (async () => {
       try {
-        const analysis = await analyzeFen(currentFen, 12, 3);
+        const analysis = await analyzeFen(currentFen, analysisDepth, 3);
         if (cancelled) return;
 
+        setCurrentEvaluation(analysis.evaluation);
         setPreMoveCoach(
           buildPreMoveCoach({
             position: new Chess(currentFen),
@@ -198,7 +339,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [analyzeFen, game, isComputerThinking, isReady, playerColor]);
+  }, [analyzeFen, analysisDepth, game, isComputerThinking, isReady, moveDelay, playerColor]);
 
   async function onPlayerMove(from: string, to: string) {
     if (!isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()) {
@@ -220,6 +361,7 @@ export default function Page() {
     setGame(new Chess(afterPlayerMove.fen()));
     setIsPreparingCoach(false);
     setIsComputerThinking(true);
+    setLastEngineMove(null);
     coachFenRef.current = '';
     computerFenRef.current = '';
     setPreMoveCoach({
@@ -230,28 +372,43 @@ export default function Page() {
     });
 
     try {
-      const beforeAnalysis = await analyzeFen(before.fen(), 12, 3);
-      const afterAnalysis = await analyzeFen(afterPlayerMove.fen(), 12);
+      const beforeAnalysis = await analyzeFen(before.fen(), analysisDepth, 3);
+      const afterAnalysis = await analyzeFen(afterPlayerMove.fen(), analysisDepth);
+      const opponentReplySan = uciToSan(afterPlayerMove, afterAnalysis.bestMove);
 
+      setCurrentEvaluation(afterAnalysis.evaluation);
       setCoachText(
         explainMove({
           move,
           before,
           after: afterPlayerMove,
           history: before.history(),
+          historyVerbose: before.history({ verbose: true }) as Move[],
           playerColor,
           engineBestMoveSan: extractSuggestedMoves(before.fen(), beforeAnalysis.topMoves)[0],
+          opponentBestReplySan: opponentReplySan,
           evalBeforeCp: beforeAnalysis.evaluation,
           evalAfterCp: afterAnalysis.evaluation,
         }),
       );
 
       if (!afterPlayerMove.isGameOver()) {
-        await delay(600);
+        await delay(moveDelay);
         if (afterAnalysis.bestMove) {
-          applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
+          const applied = applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
+          if (applied) {
+            setLastEngineMove([applied.from, applied.to]);
+          } else {
+            const fallback = playFallbackReply(afterPlayerMove);
+            if (fallback) {
+              setLastEngineMove([fallback.from, fallback.to]);
+            }
+          }
         } else {
-          playFallbackReply(afterPlayerMove);
+          const fallback = playFallbackReply(afterPlayerMove);
+          if (fallback) {
+            setLastEngineMove([fallback.from, fallback.to]);
+          }
         }
       }
 
@@ -259,8 +416,11 @@ export default function Page() {
       return true;
     } catch {
       if (!afterPlayerMove.isGameOver()) {
-        await delay(400);
-        playFallbackReply(afterPlayerMove);
+        await delay(Math.max(200, moveDelay - 150));
+        const fallback = playFallbackReply(afterPlayerMove);
+        if (fallback) {
+          setLastEngineMove([fallback.from, fallback.to]);
+        }
       }
 
       setCoachText(
@@ -269,6 +429,7 @@ export default function Page() {
           before,
           after: afterPlayerMove,
           history: before.history(),
+          historyVerbose: before.history({ verbose: true }) as Move[],
           playerColor,
         }),
       );
@@ -288,6 +449,8 @@ export default function Page() {
     setGame(new Chess());
     setCoachText(defaultExplanation);
     setPreMoveCoach(getPendingCoach(nextPlayerColor));
+    setCurrentEvaluation(null);
+    setLastEngineMove(null);
     setIsPreparingCoach(false);
     setIsComputerThinking(false);
   }
@@ -299,8 +462,8 @@ export default function Page() {
           <p className="eyebrow">Skaktræning på dansk</p>
           <h1>SkakCoach</h1>
           <p className="intro">
-            Spil som hvid, sort eller tilfældigt mod computeren og få forslag til de bedste træk,
-            før du selv rykker.
+            Spil som hvid, sort eller tilfældigt mod computeren, få forslag før dit træk og se
+            tydeligt, hvad motoren svarer.
           </p>
         </div>
 
@@ -310,6 +473,10 @@ export default function Page() {
             onMove={onPlayerMove}
             boardOrientation={playerColor === 'w' ? 'white' : 'black'}
             disabled={!isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()}
+            darkSquareColor={boardTheme.dark}
+            lightSquareColor={boardTheme.light}
+            customSquareStyles={lastEngineMoveStyles}
+            showBoardNotation={showCoordinates}
           />
 
           <div className="boardMeta">
@@ -323,11 +490,24 @@ export default function Page() {
       </section>
 
       <aside className="sideColumn">
+        <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
         <GameInfo
           game={game}
           playerColor={playerColor}
           sideChoice={playerSideChoice}
           onSideChange={startNewGame}
+        />
+        <SettingsPanel
+          difficulty={difficulty}
+          tempo={tempo}
+          theme={theme}
+          showEvalBar={showEvalBar}
+          showCoordinates={showCoordinates}
+          onDifficultyChange={setDifficulty}
+          onTempoChange={setTempo}
+          onThemeChange={setTheme}
+          onShowEvalBarChange={setShowEvalBar}
+          onShowCoordinatesChange={setShowCoordinates}
         />
         <CoachPanel
           explanation={coachText}
