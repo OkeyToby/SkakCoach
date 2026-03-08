@@ -9,6 +9,7 @@ type Props = {
   hasStarted: boolean;
   isReady: boolean;
   isComputerThinking: boolean;
+  lockedSideReason?: string | null;
   playerColor: Color;
   sideChoice: SideChoice;
   onSideChange: (side: SideChoice) => void;
@@ -26,6 +27,7 @@ export default function GameInfo({
   hasStarted,
   isReady,
   isComputerThinking,
+  lockedSideReason,
   playerColor,
   sideChoice,
   onSideChange,
@@ -47,7 +49,7 @@ export default function GameInfo({
     <AccordionPanel
       defaultOpen={true}
       summaryValue={hasStarted ? turnLabel : 'Klar til start'}
-      title="Status"
+      title="Partiinfo"
     >
       <div className="infoGrid">
         <div className="infoRow">
@@ -65,18 +67,25 @@ export default function GameInfo({
       </div>
 
       <p className="sideHint">{sideHint}</p>
-      <div className="sideChooser" role="group" aria-label="Vælg side">
-        {sideOptions.map((option) => (
-          <button
-            key={option.value}
-            className={`sideOption${sideChoice === option.value ? ' sideOptionActive' : ''}`}
-            onClick={() => onSideChange(option.value)}
-            type="button"
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      {lockedSideReason ? (
+        <div className="openingLockNote">
+          <strong>Åbningsvalg låser siden</strong>
+          <p>{lockedSideReason}</p>
+        </div>
+      ) : (
+        <div className="sideChooser" role="group" aria-label="Vælg side">
+          {sideOptions.map((option) => (
+            <button
+              key={option.value}
+              className={`sideOption${sideChoice === option.value ? ' sideOptionActive' : ''}`}
+              onClick={() => onSideChange(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <button className="resetBtn startBtn" disabled={!isReady || isComputerThinking} onClick={onStartGame} type="button">
         {hasStarted ? 'Nyt parti' : 'Start parti'}

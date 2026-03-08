@@ -19,6 +19,9 @@ export default function PuzzleBoard({ fen, disabled = false, onMove }: Props) {
         </div>
         <span className="cardBadge">{turnLabel} trækker</span>
       </div>
+      <p className="cardDescription">
+        Find det mest præcise træk på brættet. Når løsningen sidder, kan du straks gå videre til næste opgave.
+      </p>
       <ChessBoard position={fen} onMove={onMove} disabled={disabled} />
     </div>
   );

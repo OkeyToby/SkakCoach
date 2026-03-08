@@ -1,5 +1,6 @@
 'use client';
 
+import type { Route } from 'next';
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { Chess, type Color, type Move } from 'chess.js';
 import ChessBoard from '@/components/ChessBoard';
@@ -9,7 +10,9 @@ import GameInfo from '@/components/GameInfo';
 import MoveHistory from '@/components/MoveHistory';
 import SettingsPanel from '@/components/SettingsPanel';
 import PageHeader from '@/components/layout/PageHeader';
+import OpeningContextPanel from '@/components/play/OpeningContextPanel';
 import Button from '@/components/ui/Button';
+import { getOpeningBySlug } from '@/data/openings/openings';
 import {
   buildPreMoveCoach,
   explainMove,
@@ -18,6 +21,12 @@ import {
 } from '@/lib/explainMove';
 import { applyUciMove, uciToSan } from '@/lib/chessHelpers';
 import { useEngine } from '@/lib/engine/useEngine';
+import {
+  getOpeningSideChoice,
+  getOpeningTheoryState,
+} from '@/lib/openings/openingTheoryHelpers';
+import { recordOpeningPlaySession } from '@/lib/openings/openingProgressHelpers';
+import { updateOpeningsProgress } from '@/lib/openings/openingProgressStorage';
 import { recordCompletedGame } from '@/lib/profile/profileHelpers';
 import { updateProfile } from '@/lib/profile/profileStorage';
 
@@ -219,7 +228,30 @@ function isStoredSettings(value: unknown): value is StoredSettings {
   );
 }
 
-export default function PlayExperience() {
+const playHighlights = [
+  {
+    title: 'Før dit træk',
+    description: 'Coach viser kandidattræk og en kort plan, før du beslutter dig.',
+  },
+  {
+    title: 'Efter dit træk',
+    description: 'Du får konkret feedback på fordel, ulempe og et stærkere alternativ.',
+  },
+  {
+    title: 'Undervejs',
+    description: 'Tempo, styrke, stemme og tema kan tilpasses uden at forlade siden.',
+  },
+  {
+    title: 'Profilen følger med',
+    description: 'Afsluttede partier tæller automatisk i XP, streak, partier spillet og sejre.',
+  },
+];
+
+type Props = {
+  openingSlug?: string;
+};
+
+export default function PlayExperience({ openingSlug }: Props) {
   const [game, setGame] = useState(() => new Chess());
   const [hasStarted, setHasStarted] = useState(false);
   const [coachText, setCoachText] = useState<MoveExplanation>(defaultExplanation);
@@ -245,12 +277,16 @@ export default function PlayExperience() {
   const computerTaskIdRef = useRef(0);
   const isComputerThinkingRef = useRef(false);
   const { analyzeFen, isReady } = useEngine();
+  const opening = openingSlug ? getOpeningBySlug(openingSlug) : undefined;
+  const openingSideChoice = opening ? getOpeningSideChoice(opening) : null;
 
   const boardTheme = boardThemes[theme];
   const analysisDepth = difficultyDepth[difficulty];
   const moveDelay = tempoDelay[tempo];
+  const openingTheoryState = opening ? getOpeningTheoryState(opening, game.history()) : null;
   const boardDisabled =
     !hasStarted || !isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver();
+  const openingHref = opening ? (`/openings/${opening.slug}` as Route) : null;
   const lastEngineMoveStyles: Record<string, CSSProperties> =
     lastEngineMove === null
       ? {}
@@ -330,6 +366,29 @@ export default function PlayExperience() {
     isComputerThinkingRef.current = value;
     setIsComputerThinking(value);
   }, []);
+
+  useEffect(() => {
+    if (!openingSideChoice) {
+      return;
+    }
+
+    computerTaskIdRef.current += 1;
+    const previewColor = getPreviewColor(openingSideChoice);
+    coachFenRef.current = '';
+    computerFenRef.current = '';
+    completedGameFenRef.current = '';
+    lastSpokenMessageRef.current = '';
+    setPlayerSideChoice(openingSideChoice);
+    setPlayerColor(previewColor);
+    setHasStarted(false);
+    setGame(new Chess());
+    setCoachText(defaultExplanation);
+    setPreMoveCoach(getSetupCoach(openingSideChoice));
+    setCurrentEvaluation(null);
+    setLastEngineMove(null);
+    setIsPreparingCoach(false);
+    setComputerThinking(false);
+  }, [openingSideChoice, setComputerThinking]);
 
   const cancelPendingComputerMove = useCallback(() => {
     computerTaskIdRef.current += 1;
@@ -414,6 +473,20 @@ export default function PlayExperience() {
         const next = new Chess(currentFen);
 
         try {
+          const currentTheoryState = opening ? getOpeningTheoryState(opening, game.history()) : null;
+          const expectedTheoryMove = currentTheoryState?.isInTheory ? currentTheoryState.nextExpectedMove : null;
+
+          if (expectedTheoryMove) {
+            await delay(Math.min(moveDelay, 500));
+            if (computerTaskIdRef.current !== taskId) return;
+
+            const theoryMove = next.move(expectedTheoryMove);
+            if (theoryMove) {
+              setLastEngineMove([theoryMove.from, theoryMove.to]);
+              return;
+            }
+          }
+
           const analysis = await analyzeFen(currentFen, analysisDepth);
           if (computerTaskIdRef.current !== taskId) return;
 
@@ -488,7 +561,7 @@ export default function PlayExperience() {
     return () => {
       cancelled = true;
     };
-  }, [analyzeFen, analysisDepth, game, hasStarted, isReady, moveDelay, playerColor, setComputerThinking]);
+  }, [analyzeFen, analysisDepth, game, hasStarted, isReady, moveDelay, opening, playerColor, setComputerThinking]);
 
   useEffect(() => {
     if (!hasStarted || !game.isGameOver()) return;
@@ -625,7 +698,9 @@ export default function PlayExperience() {
 
   function startGame() {
     cancelPendingComputerMove();
-    const nextPlayerColor = resolvePlayerColor(playerSideChoice);
+    const nextPlayerColor = openingSideChoice
+      ? getPreviewColor(openingSideChoice)
+      : resolvePlayerColor(playerSideChoice);
     coachFenRef.current = '';
     computerFenRef.current = '';
     lastSpokenMessageRef.current = '';
@@ -638,6 +713,9 @@ export default function PlayExperience() {
     setCurrentEvaluation(null);
     setLastEngineMove(null);
     setIsPreparingCoach(false);
+    if (opening) {
+      updateOpeningsProgress((current) => recordOpeningPlaySession(current, opening.slug));
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -646,34 +724,43 @@ export default function PlayExperience() {
   return (
     <div className="playPage">
       <PageHeader
-        eyebrow="Spil mod computeren"
+        eyebrow={opening ? 'Åbningsspil mod computeren' : 'Spil mod computeren'}
         title="Spil, forstå og forbedr dig"
-        description="Få forslag før dit træk, forklaringer efter dit træk og en dansk coach, der hjælper dig med at se planen i stillingen."
+        description={
+          opening
+            ? `Du øver ${opening.name}. Så længe du bliver i starterlinjen, følger computeren den kendte teori, og derefter fortsætter SkakCoach som almindelig parti-coach.`
+            : 'Få forslag før dit træk, forklaringer efter dit træk og en dansk coach, der hjælper dig med at se planen i stillingen.'
+        }
         actions={
-          <>
-            <Button href="/tactics" variant="secondary">
-              Træn taktik først
-            </Button>
-            <Button href="/profile" variant="ghost">
-              Se min profil
-            </Button>
-          </>
+          opening && openingHref ? (
+            <>
+              <Button href={openingHref} variant="secondary">
+                Til åbningen
+              </Button>
+              <Button href="/play" variant="ghost">
+                Frit parti
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button href="/tactics" variant="secondary">
+                Træn taktik først
+              </Button>
+              <Button href="/profile" variant="ghost">
+                Se min profil
+              </Button>
+            </>
+          )
         }
       />
 
       <div className="playHighlights">
-        <div className="playHighlight">
-          <strong>Før dit træk</strong>
-          <span>Coach viser de bedste kandidattræk og en kort plan.</span>
-        </div>
-        <div className="playHighlight">
-          <strong>Efter dit træk</strong>
-          <span>Du får en konkret forklaring på fordel, ulempe og et stærkere alternativ.</span>
-        </div>
-        <div className="playHighlight">
-          <strong>Undervejs</strong>
-          <span>Tempo, styrke, stemme og tema kan tilpasses uden at forlade siden.</span>
-        </div>
+        {playHighlights.map((highlight) => (
+          <div key={highlight.title} className="playHighlight">
+            <strong>{highlight.title}</strong>
+            <span>{highlight.description}</span>
+          </div>
+        ))}
       </div>
 
       <div className="page playLayout">
@@ -701,6 +788,13 @@ export default function PlayExperience() {
         </section>
 
         <aside className="sideColumn">
+          {opening && openingTheoryState ? (
+            <OpeningContextPanel
+              hasStarted={hasStarted}
+              opening={opening}
+              theoryState={openingTheoryState}
+            />
+          ) : null}
           <CoachPanel
             explanation={coachText}
             preMoveCoach={preMoveCoach}
@@ -713,6 +807,11 @@ export default function PlayExperience() {
             hasStarted={hasStarted}
             isReady={isReady}
             isComputerThinking={isComputerThinking}
+            lockedSideReason={
+              opening
+                ? `Du øver ${opening.name} og spiller derfor ${opening.side}. Åbn /play uden opening for frit sidevalg.`
+                : null
+            }
             playerColor={playerColor}
             sideChoice={playerSideChoice}
             onSideChange={prepareGame}

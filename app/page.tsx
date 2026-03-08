@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import SectionTitle from '@/components/ui/SectionTitle';
 import StatCard from '@/components/ui/StatCard';
-import { hasRealProgress } from '@/lib/profile/profileHelpers';
+import { getXpIntoCurrentLevel, getXpToNextLevel, hasRealProgress } from '@/lib/profile/profileHelpers';
 import { useProfile } from '@/lib/profile/useProfile';
 
 const featureCards: Array<{
@@ -13,36 +13,48 @@ const featureCards: Array<{
   description: string;
   href: Route;
   badge: string;
+  eyebrow: string;
+  detail: string;
 }> = [
   {
     title: 'Spil mod computeren',
     description: 'Spil et helt parti med dansk coach før og efter dine træk.',
     href: '/play',
     badge: 'Klar nu',
+    eyebrow: 'Spil',
+    detail: 'Før og efter hvert træk',
   },
   {
     title: 'Taktik',
     description: 'Løs fokuserede opgaver og træn mønstre som mat, gafler og bindinger.',
     href: '/tactics',
     badge: 'Klar nu',
+    eyebrow: 'Træning',
+    detail: 'Korte opgaver med XP',
   },
   {
     title: 'Åbninger',
-    description: 'Byg et repertoire og lær de vigtigste planer i stillingerne.',
+    description: 'Lær korte starterlinjer, planer og typiske fejl gennem små quizforløb.',
     href: '/openings',
-    badge: 'Kommer snart',
+    badge: 'Klar nu',
+    eyebrow: 'Forberedelse',
+    detail: 'Planer, fejl og quiz',
   },
   {
     title: 'Spil som en GM',
     description: 'Træn stormesteridéer, kandidatvalg og beslutninger under pres.',
     href: '/gm',
     badge: 'Kommer snart',
+    eyebrow: 'Fordybelse',
+    detail: 'Stormesterinspirerede scenarier',
   },
   {
     title: 'Min profil',
     description: 'Se level, XP, streak og dine samlede fremskridt ét sted.',
     href: '/profile',
     badge: 'Klar nu',
+    eyebrow: 'Overblik',
+    detail: 'Lokal progression og milepæle',
   },
 ];
 
@@ -55,6 +67,9 @@ const dailyChallenge = [
 export default function HomePage() {
   const { profile, hasLoaded } = useProfile();
   const hasProgress = hasRealProgress(profile);
+  const xpInLevel = getXpIntoCurrentLevel(profile);
+  const xpToNextLevel = getXpToNextLevel();
+  const xpRemaining = Math.max(0, xpToNextLevel - xpInLevel);
 
   return (
     <main className="shellContainer pageMain homePage">
@@ -65,6 +80,11 @@ export default function HomePage() {
           <p className="homeHeroLead">
             Bliv bedre til skak med forklaringer, træning og udfordringer – helt på dansk.
           </p>
+          <div className="heroBadgeRow">
+            <span className="heroBadge">Computerpartier</span>
+            <span className="heroBadge">Taktik med XP</span>
+            <span className="heroBadge">Progression lokalt</span>
+          </div>
           <div className="heroActions">
             <Button href="/play" size="stor">
               Start træning
@@ -100,6 +120,39 @@ export default function HomePage() {
                 <strong>{profile.puzzlesSolved}</strong>
               </div>
             </div>
+            <p className="heroProgressNote">
+              {hasProgress
+                ? `Du mangler ${xpRemaining} XP til niveau ${profile.level + 1}.`
+                : 'Din lokale profil bliver synlig, så snart du spiller eller løser en opgave.'}
+            </p>
+            {hasProgress ? (
+              <div className="progressBlock">
+                <div className="progressMeta">
+                  <span>Progression i nuværende niveau</span>
+                  <strong>
+                    {xpInLevel}/{xpToNextLevel} XP
+                  </strong>
+                </div>
+                <div className="progressTrack" aria-hidden="true">
+                  <div className="progressFill" style={{ width: `${(xpInLevel / xpToNextLevel) * 100}%` }} />
+                </div>
+              </div>
+            ) : (
+              <div className="starterSteps">
+                <div>
+                  <strong>1</strong>
+                  <span>Spil et parti mod computeren</span>
+                </div>
+                <div>
+                  <strong>2</strong>
+                  <span>Løs en taktisk opgave</span>
+                </div>
+                <div>
+                  <strong>3</strong>
+                  <span>Følg din streak og XP i profilen</span>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       </section>
@@ -117,8 +170,14 @@ export default function HomePage() {
               badge={feature.badge}
               description={feature.description}
               href={feature.href}
+              eyebrow={feature.eyebrow}
               title={feature.title}
-            />
+            >
+              <div className="featureCardFooter">
+                <span>{feature.detail}</span>
+                <strong>{feature.badge === 'Klar nu' ? 'Åbn modul' : 'Se preview'}</strong>
+              </div>
+            </Card>
           ))}
         </div>
       </section>
@@ -136,6 +195,7 @@ export default function HomePage() {
               <li key={item}>{item}</li>
             ))}
           </ul>
+          <p className="challengeNote">Et kort dagligt loop er nok til at holde både blik og streak skarpe.</p>
         </Card>
 
         <Card
@@ -148,11 +208,25 @@ export default function HomePage() {
           eyebrow="Status lige nu"
           title="Kort oversigt"
         >
-          <div className="miniSummaryGrid">
-            <StatCard accent="gold" label="Level" value={profile.level} />
-            <StatCard accent="blue" label="XP" value={profile.xp} />
-            <StatCard accent="green" label="Sejre" value={profile.gamesWon} />
-          </div>
+          {hasProgress ? (
+            <div className="miniSummaryGrid">
+              <StatCard accent="gold" label="Level" value={profile.level} />
+              <StatCard accent="blue" label="XP" value={profile.xp} />
+              <StatCard accent="green" label="Sejre" value={profile.gamesWon} />
+            </div>
+          ) : (
+            <div className="summaryEmptyState">
+              <p>Ingen historik endnu. Start med ét parti eller én opgave, så tænder progressionen her.</p>
+              <div className="summaryEmptyActions">
+                <Button href="/play" variant="secondary">
+                  Spil første parti
+                </Button>
+                <Button href="/tactics" variant="ghost">
+                  Løs første opgave
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 

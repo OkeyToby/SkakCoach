@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import StatCard from '@/components/ui/StatCard';
 import { tacticPuzzles, type Puzzle } from '@/data/tactics/puzzles';
-import { recordSolvedPuzzle } from '@/lib/profile/profileHelpers';
+import { XP_PER_PUZZLE, recordSolvedPuzzle } from '@/lib/profile/profileHelpers';
 import { updateProfile } from '@/lib/profile/profileStorage';
 import { useProfile } from '@/lib/profile/useProfile';
 import { uciToSan } from '@/lib/chessHelpers';
@@ -24,7 +24,14 @@ type FeedbackState = {
 const defaultFeedback: FeedbackState = {
   variant: 'neutral',
   title: 'Klar til opgave',
-  description: 'Find det stærkeste træk i stillingen. Når du løser opgaven, får du XP med det samme.',
+  description: 'Find det stærkeste træk i stillingen. Start altid med at lede efter skakker, slag og direkte trusler.',
+};
+
+const categoryLabels: Record<Exclude<TacticFilter, 'alle'>, string> = {
+  mat: 'Mat',
+  gafler: 'Gafler',
+  bindinger: 'Bindinger',
+  materiale: 'Materiale',
 };
 
 function pickPuzzle(pool: Puzzle[], previousId?: string): Puzzle {
@@ -48,36 +55,51 @@ export default function TacticsPage() {
   const [boardFen, setBoardFen] = useState(tacticPuzzles[0].fen);
   const [feedback, setFeedback] = useState<FeedbackState>(defaultFeedback);
   const [isSolved, setIsSolved] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [sessionSolved, setSessionSolved] = useState(0);
 
   const filteredPuzzles =
     activeFilter === 'alle'
       ? tacticPuzzles
       : tacticPuzzles.filter((puzzle) => puzzle.category === activeFilter);
 
+  const activeFilterLabel = activeFilter === 'alle' ? 'Alle' : categoryLabels[activeFilter];
+  const currentCategoryLabel = categoryLabels[currentPuzzle.category];
+  const feedbackDetail =
+    feedback.variant === 'korrekt'
+      ? `Belønning: ${XP_PER_PUZZLE} XP. Løst i denne session: ${sessionSolved}.`
+      : feedback.variant === 'forkert'
+        ? `Forsøg i denne opgave: ${attempts}. Du kan prøve igen med det samme eller gå videre til næste opgave.`
+        : `Belønning: ${XP_PER_PUZZLE} XP. Vælg et forcing træk først, før du ser på mere stille ideer.`;
+
+  function loadPuzzle(puzzle: Puzzle) {
+    setCurrentPuzzle(puzzle);
+    setBoardFen(puzzle.fen);
+    setFeedback(defaultFeedback);
+    setIsSolved(false);
+    setAttempts(0);
+  }
+
   useEffect(() => {
     if (filteredPuzzles.some((puzzle) => puzzle.id === currentPuzzle.id)) {
       return;
     }
 
-    const nextPuzzle = pickPuzzle(filteredPuzzles, currentPuzzle.id);
-    setCurrentPuzzle(nextPuzzle);
-    setBoardFen(nextPuzzle.fen);
-    setFeedback(defaultFeedback);
-    setIsSolved(false);
+    loadPuzzle(pickPuzzle(filteredPuzzles, currentPuzzle.id));
   }, [currentPuzzle.id, filteredPuzzles]);
 
   const solutionSan = uciToSan(new Chess(currentPuzzle.fen), currentPuzzle.solution[0]) ?? currentPuzzle.solution[0];
 
   function loadNextPuzzle() {
-    const nextPuzzle = pickPuzzle(filteredPuzzles, currentPuzzle.id);
-    setCurrentPuzzle(nextPuzzle);
-    setBoardFen(nextPuzzle.fen);
-    setFeedback(defaultFeedback);
-    setIsSolved(false);
+    loadPuzzle(pickPuzzle(filteredPuzzles, currentPuzzle.id));
   }
 
   function handleFilterChange(filter: TacticFilter) {
     setActiveFilter(filter);
+  }
+
+  function resetFeedback() {
+    setFeedback(defaultFeedback);
   }
 
   function handlePuzzleMove(from: string, to: string) {
@@ -100,6 +122,8 @@ export default function TacticsPage() {
     if (moveMatchesSolution(moveUci, currentPuzzle.solution[0])) {
       setBoardFen(chess.fen());
       setIsSolved(true);
+      setAttempts((current) => current + 1);
+      setSessionSolved((current) => current + 1);
       setFeedback({
         variant: 'korrekt',
         title: 'Korrekt!',
@@ -110,12 +134,40 @@ export default function TacticsPage() {
     }
 
     setBoardFen(currentPuzzle.fen);
+    setAttempts((current) => current + 1);
     setFeedback({
       variant: 'forkert',
       title: 'Forkert',
-      description: `Det stærkeste træk var ${solutionSan}. ${currentPuzzle.explanation}`,
+      description: `Det stærkeste træk var ${solutionSan}. Idéen er: ${currentPuzzle.explanation}`,
     });
     return false;
+  }
+
+  if (filteredPuzzles.length === 0) {
+    return (
+      <main className="shellContainer pageMain">
+        <PageHeader
+          eyebrow="Taktiktræning"
+          title="Løs taktiske opgaver"
+          description="Denne kategori har ingen opgaver endnu. Skift filter eller fortsæt med en anden træningsform."
+          actions={
+            <>
+              <Button href="/play" variant="secondary">
+                Spil et parti
+              </Button>
+              <Button onClick={() => setActiveFilter('alle')} variant="ghost" type="button">
+                Vis alle opgaver
+              </Button>
+            </>
+          }
+        />
+        <Card badge="Ingen opgaver her endnu" title="Vælg en anden kategori">
+          <p className="cardDescription">
+            Vi har allerede opgaver i andre kategorier, så du kan fortsætte træningen uden afbrydelse.
+          </p>
+        </Card>
+      </main>
+    );
   }
 
   return (
@@ -138,8 +190,9 @@ export default function TacticsPage() {
 
       <div className="tacticsTopGrid">
         <StatCard accent="gold" label="Løst i alt" value={profile.puzzlesSolved} hint="Samlede korrekte opgaver." />
-        <StatCard accent="blue" label="Aktiv kategori" value={activeFilter === 'alle' ? 'Alle' : activeFilter} hint="Skift fokus med filtrene." />
-        <StatCard accent="green" label="XP fra opgaver" value={profile.puzzlesSolved * 20} hint="20 XP for hver korrekt løsning." />
+        <StatCard accent="blue" label="I denne session" value={sessionSolved} hint="Nye løsninger siden du åbnede siden." />
+        <StatCard label="Aktiv kategori" value={activeFilterLabel} hint={`${filteredPuzzles.length} opgaver i dette fokus.`} />
+        <StatCard accent="green" label="XP fra opgaver" value={profile.puzzlesSolved * XP_PER_PUZZLE} hint={`${XP_PER_PUZZLE} XP for hver korrekt løsning.`} />
       </div>
 
       <TacticFilterBar activeFilter={activeFilter} onFilterChange={handleFilterChange} />
@@ -151,22 +204,36 @@ export default function TacticsPage() {
           <Card
             badge={`Sværhedsgrad ${currentPuzzle.difficulty}`}
             description={currentPuzzle.explanation}
-            eyebrow={`Kategori: ${currentPuzzle.category}`}
+            eyebrow={`Kategori: ${currentCategoryLabel}`}
             title={currentPuzzle.title}
           >
             <div className="puzzleMetaRow">
               <span>Stillings-ID</span>
               <strong>{currentPuzzle.id}</strong>
             </div>
+            <div className="puzzleMetaRow">
+              <span>Forsøg</span>
+              <strong>{attempts === 0 ? 'Ikke startet' : attempts}</strong>
+            </div>
           </Card>
 
           <PuzzleFeedback
             description={feedback.description}
+            detail={feedbackDetail}
             title={feedback.title}
             variant={feedback.variant}
-          />
+          >
+            {feedback.variant === 'forkert' ? (
+              <Button onClick={resetFeedback} type="button" variant="secondary">
+                Prøv igen
+              </Button>
+            ) : null}
+            <Button onClick={loadNextPuzzle} type="button" variant={isSolved ? 'primary' : 'ghost'}>
+              Næste opgave
+            </Button>
+          </PuzzleFeedback>
 
-          <Card title="Sådan får du mest ud af træningen">
+          <Card badge="Træningsrytme" title="Sådan får du mest ud af træningen">
             <ul className="placeholderList">
               <li>Se først efter skakker, slag og trusler.</li>
               <li>Navngiv motivet for dig selv, før du klikker videre.</li>

@@ -24,7 +24,7 @@ export default function EvalBar({ evaluation, visible }: Props) {
   const label = formatEvaluationLabel(evaluation);
 
   return (
-    <AccordionPanel defaultOpen={false} summaryValue={label} title="Evaluering">
+    <AccordionPanel defaultOpen={false} summaryValue={label} title="Evalueringsbar">
       <div className="evalBar" aria-label={`Evaluering: ${formatEvaluationLabel(evaluation)}`}>
         <div className="evalBarWhite" style={{ height: `${whiteShare}%` }} />
       </div>

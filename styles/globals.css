@@ -136,8 +136,27 @@ ol {
   gap: 2px;
 }
 
+.brandHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .brandText strong {
   font-size: 1rem;
+}
+
+.brandPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(19, 59, 92, 0.08);
+  color: var(--brand-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .brandText small {
@@ -145,11 +164,39 @@ ol {
   font-size: 0.82rem;
 }
 
+.navGroups {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.navSection {
+  display: grid;
+  gap: 8px;
+}
+
+.navSectionLabel {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .navPrimary,
 .navSecondary {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.navPrimary::-webkit-scrollbar,
+.navSecondary::-webkit-scrollbar,
+.filterBar::-webkit-scrollbar {
+  display: none;
 }
 
 .navLink,
@@ -437,6 +484,25 @@ ol {
   line-height: 1.8;
 }
 
+.heroBadgeRow,
+.comingSoonPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(19, 59, 92, 0.08);
+  color: var(--brand-strong);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .homeHeroAside {
   display: grid;
   align-items: stretch;
@@ -444,7 +510,7 @@ ol {
 
 .heroMiniStats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 12px;
 }
 
@@ -467,16 +533,24 @@ ol {
   font-size: 1.5rem;
 }
 
+.heroProgressNote,
+.challengeNote,
+.profileHeroNote,
+.puzzleFeedbackDetail {
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
 .featureGrid,
 .statsGrid,
 .placeholderGrid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .featureGrid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .homeSplitGrid,
@@ -501,10 +575,60 @@ ol {
   line-height: 1.6;
 }
 
+.featureCardFooter,
+.profileMetricRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.featureCardFooter {
+  padding-top: 4px;
+  border-top: 1px solid rgba(32, 41, 58, 0.08);
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.featureCardFooter strong {
+  color: var(--brand-strong);
+}
+
 .miniSummaryGrid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.summaryEmptyState {
+  display: grid;
+  gap: 14px;
+}
+
+.summaryEmptyActions,
+.placeholderActions,
+.puzzleFeedbackActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.starterSteps {
+  display: grid;
+  gap: 12px;
+}
+
+.starterSteps div,
+.profileHeroStats div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(19, 59, 92, 0.06);
+}
+
+.starterSteps strong {
+  font-size: 1.1rem;
 }
 
 .playPage {
@@ -515,7 +639,7 @@ ol {
 .playHighlights {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .playHighlight {
@@ -940,13 +1064,87 @@ ol {
 .tacticsTopGrid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.openingTopGrid,
+.openingQuizStats {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.openingOverviewSplit,
+.openingDetailGrid,
+.openingQuizLayout {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+}
+
+.openingCard {
+  gap: 16px;
+}
+
+.openingLinePreview {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(19, 59, 92, 0.06);
+  border: 1px solid rgba(19, 59, 92, 0.08);
+  color: var(--brand-strong);
+  font-family: Consolas, 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.openingLinePreviewStrong {
+  font-size: 1rem;
+}
+
+.openingCardFacts {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.openingCardFact,
+.openingMoveChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(32, 41, 58, 0.08);
+}
+
+.openingCardFact {
+  display: grid;
+  justify-items: start;
+}
+
+.openingCardFact span {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.openingCardFact strong {
+  font-size: 1.1rem;
+}
+
+.openingNextCard {
+  background:
+    radial-gradient(circle at top right, rgba(19, 59, 92, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 243, 236, 0.94));
 }
 
 .filterBar {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .puzzleBoardCard {
@@ -971,6 +1169,10 @@ ol {
   line-height: 1.65;
 }
 
+.puzzleFeedbackActions {
+  padding-top: 4px;
+}
+
 .puzzleFeedbackKorrekt {
   background: var(--success-soft);
   border-color: rgba(31, 122, 82, 0.16);
@@ -987,6 +1189,102 @@ ol {
 
 .profileHero {
   gap: 18px;
+}
+
+.openingBoardPreview,
+.openingLineCard {
+  align-content: start;
+}
+
+.openingMoveTrack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.openingMoveChip {
+  color: var(--brand-strong);
+  font-weight: 700;
+}
+
+.openingChecklist li {
+  margin-bottom: 4px;
+}
+
+.openingTheoryNote,
+.openingLockNote {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(19, 59, 92, 0.06);
+}
+
+.openingTheoryNote strong,
+.openingLockNote strong {
+  font-size: 0.95rem;
+}
+
+.openingTheoryNote p,
+.openingLockNote p {
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.openingTheoryNoteWarn {
+  background: var(--warning-soft);
+}
+
+.openingQuizSection {
+  display: grid;
+  gap: 18px;
+}
+
+.openingQuizHeader {
+  display: grid;
+  gap: 10px;
+  max-width: 72ch;
+}
+
+.profileHeroStats,
+.profileSpotlightGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.profileHeroStats span,
+.profileMetricRow span {
+  color: var(--ink-soft);
+}
+
+.profileHeroStats strong {
+  font-size: 1.4rem;
+}
+
+.profileMetricList {
+  display: grid;
+  gap: 12px;
+}
+
+.profileEmptyCard {
+  background:
+    radial-gradient(circle at top right, rgba(19, 59, 92, 0.1), transparent 34%),
+    rgba(255, 255, 255, 0.92);
+}
+
+.comingSoonIntro {
+  gap: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(193, 139, 29, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 243, 236, 0.94));
+}
+
+.comingSoonIntroHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .progressBlock {
@@ -1022,22 +1320,14 @@ ol {
 }
 
 @media (max-width: 1180px) {
-  .featureGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .page,
   .tacticsLayout,
   .homeHero,
-  .homeSplitGrid {
+  .homeSplitGrid,
+  .openingOverviewSplit,
+  .openingDetailGrid,
+  .openingQuizLayout {
     grid-template-columns: 1fr;
-  }
-
-  .playHighlights,
-  .tacticsTopGrid,
-  .statsGrid,
-  .placeholderGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1062,23 +1352,22 @@ ol {
 
   .pageHeaderActions,
   .heroActions,
+  .navGroups,
+  .navSection,
   .navPrimary,
   .navSecondary {
     width: 100%;
   }
 
   .pageHeaderActions .button,
-  .heroActions .button {
+  .heroActions .button,
+  .summaryEmptyActions .button,
+  .placeholderActions .button,
+  .puzzleFeedbackActions .button {
     flex: 1 1 220px;
   }
 
-  .featureGrid,
-  .statsGrid,
-  .placeholderGrid,
-  .tacticsTopGrid,
-  .playHighlights,
-  .miniSummaryGrid,
-  .heroMiniStats {
+  .openingCardFacts {
     grid-template-columns: 1fr;
   }
 
@@ -1089,20 +1378,26 @@ ol {
   .puzzleBoardHeader,
   .profileHeroHeader,
   .progressMeta,
-  .puzzleMetaRow {
+  .puzzleMetaRow,
+  .comingSoonIntroHeader,
+  .featureCardFooter,
+  .profileMetricRow {
     align-items: flex-start;
     flex-direction: column;
   }
 }
 
 @media (max-width: 640px) {
-  .brandText small,
-  .navSecondary {
+  .brandText small {
     display: none;
   }
 
   .navbarInner {
     gap: 12px;
+  }
+
+  .navSectionLabel {
+    display: none;
   }
 
   .homeHeroContent h1,
@@ -1112,5 +1407,10 @@ ol {
 
   .boardWrap {
     padding: 10px;
+  }
+
+  .openingMoveChip {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
