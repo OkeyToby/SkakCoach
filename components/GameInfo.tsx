@@ -5,9 +5,13 @@ type SideChoice = 'white' | 'black' | 'random';
 
 type Props = {
   game: Chess;
+  hasStarted: boolean;
+  isReady: boolean;
+  isComputerThinking: boolean;
   playerColor: Color;
   sideChoice: SideChoice;
   onSideChange: (side: SideChoice) => void;
+  onStartGame: () => void;
 };
 
 const sideOptions: Array<{ value: SideChoice; label: string }> = [
@@ -16,13 +20,27 @@ const sideOptions: Array<{ value: SideChoice; label: string }> = [
   { value: 'random', label: 'Tilfældig' },
 ];
 
-export default function GameInfo({ game, playerColor, sideChoice, onSideChange }: Props) {
+export default function GameInfo({
+  game,
+  hasStarted,
+  isReady,
+  isComputerThinking,
+  playerColor,
+  sideChoice,
+  onSideChange,
+  onStartGame,
+}: Props) {
   const latestMove = game.history().at(-1) ?? 'Ingen træk endnu';
   const playerColorLabel = playerColor === 'w' ? 'Hvid' : 'Sort';
-  const sideHint =
-    sideChoice === 'random'
-      ? `Tilfældig side er valgt. Du spiller ${playerColorLabel.toLowerCase()} i dette parti.`
-      : `Du spiller ${playerColorLabel.toLowerCase()} i dette parti.`;
+  const sideHint = hasStarted
+    ? sideChoice === 'random'
+      ? `Tilfældig side blev valgt. Du spiller ${playerColorLabel.toLowerCase()} i dette parti.`
+      : `Du spiller ${playerColorLabel.toLowerCase()} i dette parti.`
+    : sideChoice === 'random'
+      ? 'Tilfældig side vælges, når du trykker Start parti.'
+      : `Du starter som ${playerColorLabel.toLowerCase()}, når du trykker Start parti.`;
+  const statusLabel = hasStarted ? getGameStatus(game) : 'Klar til start';
+  const turnLabel = hasStarted ? getTurnLabel(game.turn(), playerColor) : 'Venter på start';
 
   return (
     <div className="panel">
@@ -30,11 +48,11 @@ export default function GameInfo({ game, playerColor, sideChoice, onSideChange }
       <div className="infoGrid">
         <div className="infoRow">
           <span>Parti</span>
-          <strong>{getGameStatus(game)}</strong>
+          <strong>{statusLabel}</strong>
         </div>
         <div className="infoRow">
           <span>Tur</span>
-          <strong>{getTurnLabel(game.turn(), playerColor)}</strong>
+          <strong>{turnLabel}</strong>
         </div>
         <div className="infoRow">
           <span>Seneste træk</span>
@@ -55,6 +73,10 @@ export default function GameInfo({ game, playerColor, sideChoice, onSideChange }
           </button>
         ))}
       </div>
+
+      <button className="resetBtn startBtn" disabled={!isReady || isComputerThinking} onClick={onStartGame} type="button">
+        {hasStarted ? 'Nyt parti' : 'Start parti'}
+      </button>
     </div>
   );
 }

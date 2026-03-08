@@ -4,6 +4,8 @@ type Props = {
   explanation: MoveExplanation;
   preMoveCoach: PreMoveCoach;
   isPreparing: boolean;
+  voiceSupported: boolean;
+  onReadAloud: () => void;
 };
 
 function getClassificationClass(classification: string): string {
@@ -15,10 +17,26 @@ function getClassificationClass(classification: string): string {
   return 'coachBadge coachBadgeGood';
 }
 
-export default function CoachPanel({ explanation, preMoveCoach, isPreparing }: Props) {
+export default function CoachPanel({
+  explanation,
+  preMoveCoach,
+  isPreparing,
+  voiceSupported,
+  onReadAloud,
+}: Props) {
   return (
     <div className="panel">
-      <h2>SkakCoach</h2>
+      <div className="panelHeader">
+        <h2>SkakCoach</h2>
+        <button
+          className="voiceBtn"
+          disabled={!voiceSupported}
+          onClick={onReadAloud}
+          type="button"
+        >
+          Læs op
+        </button>
+      </div>
 
       <div className="coachPreview">
         <div className="coachPreviewHeader">

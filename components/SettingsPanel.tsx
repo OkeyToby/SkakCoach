@@ -8,11 +8,14 @@ type Props = {
   theme: Theme;
   showEvalBar: boolean;
   showCoordinates: boolean;
+  voiceEnabled: boolean;
+  voiceSupported: boolean;
   onDifficultyChange: (value: Difficulty) => void;
   onTempoChange: (value: Tempo) => void;
   onThemeChange: (value: Theme) => void;
   onShowEvalBarChange: (value: boolean) => void;
   onShowCoordinatesChange: (value: boolean) => void;
+  onVoiceEnabledChange: (value: boolean) => void;
 };
 
 export default function SettingsPanel({
@@ -21,11 +24,14 @@ export default function SettingsPanel({
   theme,
   showEvalBar,
   showCoordinates,
+  voiceEnabled,
+  voiceSupported,
   onDifficultyChange,
   onTempoChange,
   onThemeChange,
   onShowEvalBarChange,
   onShowCoordinatesChange,
+  onVoiceEnabledChange,
 }: Props) {
   return (
     <div className="panel">
@@ -77,6 +83,16 @@ export default function SettingsPanel({
             type="checkbox"
           />
           <span>Vis koordinater</span>
+        </label>
+
+        <label className={`toggleRow${!voiceSupported ? ' toggleRowDisabled' : ''}`}>
+          <input
+            checked={voiceEnabled}
+            disabled={!voiceSupported}
+            onChange={(event) => onVoiceEnabledChange(event.target.checked)}
+            type="checkbox"
+          />
+          <span>{voiceSupported ? 'Læs coachen højt automatisk' : 'Stemme ikke tilgængelig i denne browser'}</span>
         </label>
       </div>
     </div>

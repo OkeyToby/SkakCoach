@@ -97,6 +97,32 @@ h1 {
   font-size: 1.05rem;
 }
 
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.panelHeader h2 {
+  margin-bottom: 0;
+}
+
+.voiceBtn {
+  border: 1px solid #d6d3d1;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.voiceBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .coachPreview {
   margin-bottom: 14px;
   padding: 14px;
@@ -324,6 +350,10 @@ h1 {
   line-height: 1.4;
 }
 
+.toggleRowDisabled {
+  opacity: 0.6;
+}
+
 .coachBox {
   margin-top: 12px;
   padding: 14px;
@@ -374,6 +404,17 @@ h1 {
 .resetBtn:hover {
   background: #1f2937;
   transform: translateY(-1px);
+}
+
+.resetBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.startBtn {
+  width: 100%;
+  margin-top: 14px;
 }
 
 .thinking {
@@ -432,6 +473,7 @@ h1 {
   }
 
   .coachPreviewHeader,
+  .panelHeader,
   .coachSummary,
   .infoRow {
     align-items: flex-start;

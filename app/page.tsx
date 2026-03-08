@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { Chess, type Color, type Move } from 'chess.js';
 import ChessBoard from '@/components/ChessBoard';
 import CoachPanel from '@/components/CoachPanel';
@@ -27,6 +27,7 @@ type StoredSettings = {
   theme: BoardThemeKey;
   showEvalBar: boolean;
   showCoordinates: boolean;
+  voiceEnabled: boolean;
 };
 
 const SETTINGS_KEY = 'skakcoach-settings';
@@ -69,9 +70,9 @@ const boardThemes: Record<
 
 const defaultExplanation: MoveExplanation = {
   classification: 'Afventer træk',
-  advantage: 'Spil dit første træk og prøv at sætte en officer i gang.',
+  advantage: 'Vælg side og tryk Start parti, når du er klar.',
   drawback: 'Ingen vurdering endnu.',
-  betterMove: 'Kæmp gerne om centrum tidligt og tænk på rokade.',
+  betterMove: 'Du kan ændre tema, tempo og styrke før du starter.',
 };
 
 function resolvePlayerColor(choice: PlayerSideChoice): Color {
@@ -80,6 +81,11 @@ function resolvePlayerColor(choice: PlayerSideChoice): Color {
   }
 
   return choice === 'white' ? 'w' : 'b';
+}
+
+function getPreviewColor(choice: PlayerSideChoice): Color {
+  if (choice === 'black') return 'b';
+  return 'w';
 }
 
 function playFallbackReply(game: Chess): Move | null {
@@ -92,6 +98,18 @@ function playFallbackReply(game: Chess): Move | null {
     to: reply.to,
     promotion: reply.promotion ?? 'q',
   });
+}
+
+function getSetupCoach(choice: PlayerSideChoice): PreMoveCoach {
+  return {
+    suggestedMoves: [],
+    summary: 'Tryk Start parti for at begynde.',
+    plan:
+      choice === 'random'
+        ? 'Vælg gerne tema og sværhedsgrad først. Farven vælges, når partiet starter.'
+        : 'Du kan vælge tema, tempo og styrke, før partiet går i gang.',
+    caution: '',
+  };
 }
 
 function getPendingCoach(playerColor: Color): PreMoveCoach {
@@ -119,7 +137,7 @@ function getGameOverCoach(): PreMoveCoach {
   return {
     suggestedMoves: [],
     summary: 'Partiet er slut.',
-    plan: 'Start et nyt parti for at få nye forslag fra coachen.',
+    plan: 'Tryk Nyt parti for at starte igen med den valgte side.',
     caution: '',
   };
 }
@@ -148,6 +166,26 @@ function extractSuggestedMoves(
     .filter((move): move is string => Boolean(move));
 }
 
+function buildExplanationSpeech(explanation: MoveExplanation): string {
+  return [
+    `Vurdering: ${explanation.classification}.`,
+    `Fordel: ${explanation.advantage}`,
+    `Ulempe: ${explanation.drawback}`,
+    `Bedre mulighed: ${explanation.betterMove}`,
+  ].join(' ');
+}
+
+function buildPreMoveSpeech(preMoveCoach: PreMoveCoach): string {
+  const suggestedMoves =
+    preMoveCoach.suggestedMoves.length > 0
+      ? `Forslagene er: ${preMoveCoach.suggestedMoves.join(', ')}.`
+      : '';
+
+  return [preMoveCoach.summary, suggestedMoves, preMoveCoach.plan, preMoveCoach.caution]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function isStoredSettings(value: unknown): value is StoredSettings {
   if (!value || typeof value !== 'object') return false;
 
@@ -159,14 +197,16 @@ function isStoredSettings(value: unknown): value is StoredSettings {
     (candidate.tempo === 'hurtig' || candidate.tempo === 'normal' || candidate.tempo === 'rolig') &&
     (candidate.theme === 'classic' || candidate.theme === 'forest' || candidate.theme === 'ocean') &&
     typeof candidate.showEvalBar === 'boolean' &&
-    typeof candidate.showCoordinates === 'boolean'
+    typeof candidate.showCoordinates === 'boolean' &&
+    typeof candidate.voiceEnabled === 'boolean'
   );
 }
 
 export default function Page() {
   const [game, setGame] = useState(() => new Chess());
+  const [hasStarted, setHasStarted] = useState(false);
   const [coachText, setCoachText] = useState<MoveExplanation>(defaultExplanation);
-  const [preMoveCoach, setPreMoveCoach] = useState<PreMoveCoach>(() => getPendingCoach('w'));
+  const [preMoveCoach, setPreMoveCoach] = useState<PreMoveCoach>(() => getSetupCoach('white'));
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [isPreparingCoach, setIsPreparingCoach] = useState(false);
   const [playerSideChoice, setPlayerSideChoice] = useState<PlayerSideChoice>('white');
@@ -178,7 +218,10 @@ export default function Page() {
   const [theme, setTheme] = useState<BoardThemeKey>('classic');
   const [showEvalBar, setShowEvalBar] = useState(true);
   const [showCoordinates, setShowCoordinates] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const settingsLoadedRef = useRef(false);
+  const lastSpokenMessageRef = useRef('');
   const coachFenRef = useRef('');
   const computerFenRef = useRef('');
   const { analyzeFen, isReady } = useEngine();
@@ -186,6 +229,8 @@ export default function Page() {
   const boardTheme = boardThemes[theme];
   const analysisDepth = difficultyDepth[difficulty];
   const moveDelay = tempoDelay[tempo];
+  const boardDisabled =
+    !hasStarted || !isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver();
   const lastEngineMoveStyles: Record<string, CSSProperties> =
     lastEngineMove === null
       ? {}
@@ -214,11 +259,35 @@ export default function Page() {
       setTheme(parsed.theme);
       setShowEvalBar(parsed.showEvalBar);
       setShowCoordinates(parsed.showCoordinates);
+      setVoiceEnabled(parsed.voiceEnabled);
     } catch {
       // Ignore malformed local settings and keep defaults.
     } finally {
       settingsLoadedRef.current = true;
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const supported =
+      'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined';
+    setVoiceSupported(supported);
+
+    if (!supported) return;
+
+    const synth = window.speechSynthesis;
+    const handleVoicesChanged = () => {
+      synth.getVoices();
+    };
+
+    handleVoicesChanged();
+    synth.addEventListener('voiceschanged', handleVoicesChanged);
+
+    return () => {
+      synth.cancel();
+      synth.removeEventListener('voiceschanged', handleVoicesChanged);
+    };
   }, []);
 
   useEffect(() => {
@@ -232,12 +301,62 @@ export default function Page() {
         theme,
         showEvalBar,
         showCoordinates,
+        voiceEnabled,
       } satisfies StoredSettings),
     );
-  }, [difficulty, showCoordinates, showEvalBar, tempo, theme]);
+  }, [difficulty, showCoordinates, showEvalBar, tempo, theme, voiceEnabled]);
+
+  const speakText = useCallback(
+    (text: string) => {
+      if (!voiceSupported || typeof window === 'undefined' || !text.trim()) return;
+
+      const synth = window.speechSynthesis;
+      const utterance = new window.SpeechSynthesisUtterance(text);
+      utterance.lang = 'da-DK';
+
+      const voices = synth.getVoices();
+      const danishVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith('da'));
+      if (danishVoice) {
+        utterance.voice = danishVoice;
+      }
+
+      synth.cancel();
+      synth.speak(utterance);
+    },
+    [voiceSupported],
+  );
 
   useEffect(() => {
-    if (!isReady || isComputerThinking) return;
+    if (!hasStarted || !voiceEnabled || !voiceSupported) return;
+    if (coachText.classification === 'Afventer træk') return;
+
+    const message = buildExplanationSpeech(coachText);
+    if (lastSpokenMessageRef.current === message) return;
+
+    lastSpokenMessageRef.current = message;
+    speakText(message);
+  }, [coachText, hasStarted, speakText, voiceEnabled, voiceSupported]);
+
+  const handleReadCoachAloud = useCallback(() => {
+    const parts = [];
+
+    if (preMoveCoach.summary) {
+      parts.push(`Før dit træk. ${buildPreMoveSpeech(preMoveCoach)}`);
+    }
+
+    if (hasStarted && coachText.classification !== 'Afventer træk') {
+      parts.push(`Seneste vurdering. ${buildExplanationSpeech(coachText)}`);
+    }
+
+    if (parts.length === 0) {
+      parts.push(buildExplanationSpeech(defaultExplanation));
+    }
+
+    speakText(parts.join(' '));
+  }, [coachText, hasStarted, preMoveCoach, speakText]);
+
+  useEffect(() => {
+    if (!hasStarted || !isReady || isComputerThinking) return;
 
     const currentFen = game.fen();
 
@@ -339,10 +458,10 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [analyzeFen, analysisDepth, game, isComputerThinking, isReady, moveDelay, playerColor]);
+  }, [analyzeFen, analysisDepth, game, hasStarted, isComputerThinking, isReady, moveDelay, playerColor]);
 
   async function onPlayerMove(from: string, to: string) {
-    if (!isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()) {
+    if (!hasStarted || !isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()) {
       return false;
     }
 
@@ -440,12 +559,33 @@ export default function Page() {
     }
   }
 
-  function startNewGame(nextChoice = playerSideChoice) {
-    const nextPlayerColor = resolvePlayerColor(nextChoice);
+  function prepareGame(nextChoice = playerSideChoice) {
+    const previewColor = getPreviewColor(nextChoice);
     coachFenRef.current = '';
     computerFenRef.current = '';
+    lastSpokenMessageRef.current = '';
     setPlayerSideChoice(nextChoice);
+    setPlayerColor(previewColor);
+    setHasStarted(false);
+    setGame(new Chess());
+    setCoachText(defaultExplanation);
+    setPreMoveCoach(getSetupCoach(nextChoice));
+    setCurrentEvaluation(null);
+    setLastEngineMove(null);
+    setIsPreparingCoach(false);
+    setIsComputerThinking(false);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  function startGame() {
+    const nextPlayerColor = resolvePlayerColor(playerSideChoice);
+    coachFenRef.current = '';
+    computerFenRef.current = '';
+    lastSpokenMessageRef.current = '';
     setPlayerColor(nextPlayerColor);
+    setHasStarted(true);
     setGame(new Chess());
     setCoachText(defaultExplanation);
     setPreMoveCoach(getPendingCoach(nextPlayerColor));
@@ -453,6 +593,9 @@ export default function Page() {
     setLastEngineMove(null);
     setIsPreparingCoach(false);
     setIsComputerThinking(false);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
   }
 
   return (
@@ -462,8 +605,8 @@ export default function Page() {
           <p className="eyebrow">Skaktræning på dansk</p>
           <h1>SkakCoach</h1>
           <p className="intro">
-            Spil som hvid, sort eller tilfældigt mod computeren, få forslag før dit træk og se
-            tydeligt, hvad motoren svarer.
+            Vælg side, indstil tempo og tryk Start parti, når du er klar til at spille mod
+            computeren.
           </p>
         </div>
 
@@ -472,7 +615,7 @@ export default function Page() {
             position={game.fen()}
             onMove={onPlayerMove}
             boardOrientation={playerColor === 'w' ? 'white' : 'black'}
-            disabled={!isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()}
+            disabled={boardDisabled}
             darkSquareColor={boardTheme.dark}
             lightSquareColor={boardTheme.light}
             customSquareStyles={lastEngineMoveStyles}
@@ -480,10 +623,8 @@ export default function Page() {
           />
 
           <div className="boardMeta">
-            <button className="resetBtn" onClick={() => startNewGame()} type="button">
-              Nyt parti
-            </button>
             {!isReady && <p className="statusNote">Stockfish starter…</p>}
+            {!hasStarted && isReady && <p className="statusNote">Tryk Start parti for at begynde.</p>}
             {isComputerThinking && <p className="thinking">Computeren tænker…</p>}
           </div>
         </div>
@@ -493,9 +634,13 @@ export default function Page() {
         <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
         <GameInfo
           game={game}
+          hasStarted={hasStarted}
+          isReady={isReady}
+          isComputerThinking={isComputerThinking}
           playerColor={playerColor}
           sideChoice={playerSideChoice}
-          onSideChange={startNewGame}
+          onSideChange={prepareGame}
+          onStartGame={startGame}
         />
         <SettingsPanel
           difficulty={difficulty}
@@ -503,16 +648,21 @@ export default function Page() {
           theme={theme}
           showEvalBar={showEvalBar}
           showCoordinates={showCoordinates}
+          voiceEnabled={voiceEnabled}
+          voiceSupported={voiceSupported}
           onDifficultyChange={setDifficulty}
           onTempoChange={setTempo}
           onThemeChange={setTheme}
           onShowEvalBarChange={setShowEvalBar}
           onShowCoordinatesChange={setShowCoordinates}
+          onVoiceEnabledChange={setVoiceEnabled}
         />
         <CoachPanel
           explanation={coachText}
           preMoveCoach={preMoveCoach}
           isPreparing={isPreparingCoach}
+          voiceSupported={voiceSupported}
+          onReadAloud={handleReadCoachAloud}
         />
         <MoveHistory moves={game.history()} />
       </aside>
