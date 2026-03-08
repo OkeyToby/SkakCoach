@@ -41,6 +41,7 @@ export type Opening = {
   coreIdeas: string[];
   commonMistakes: string[];
   starterMoves: string[];
+  starterMovesUci: string[];
   previewFen: string;
   quiz: OpeningQuizStep[];
 };
@@ -84,9 +85,24 @@ function buildPreviewFen(starterMoves: string[]): string {
   return chess.fen();
 }
 
+function buildStarterMovesUci(starterMoves: string[]): string[] {
+  const chess = new Chess();
+
+  return starterMoves.map((move) => {
+    const appliedMove = chess.move(move);
+
+    if (!appliedMove) {
+      throw new Error(`Kunne ikke bygge startertræk for linjen ${starterMoves.join(' ')}`);
+    }
+
+    return moveToUci(appliedMove);
+  });
+}
+
 function buildOpening(seed: OpeningSeed): Opening {
   return {
     ...seed,
+    starterMovesUci: buildStarterMovesUci(seed.starterMoves),
     previewFen: buildPreviewFen(seed.starterMoves),
     quiz: seed.quiz.map(buildQuizStep),
   };

@@ -5,11 +5,12 @@ type Props = {
   description: string;
   eyebrow?: string;
   actions?: ReactNode;
+  className?: string;
 };
 
-export default function PageHeader({ title, description, eyebrow, actions }: Props) {
+export default function PageHeader({ title, description, eyebrow, actions, className }: Props) {
   return (
-    <section className="pageHeader">
+    <section className={className ? `pageHeader ${className}` : 'pageHeader'}>
       <div className="pageHeaderContent">
         {eyebrow ? <p className="sectionEyebrow">{eyebrow}</p> : null}
         <h1>{title}</h1>

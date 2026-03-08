@@ -443,6 +443,15 @@ ol {
   line-height: 1.7;
 }
 
+.pageHeaderCompact {
+  gap: 16px;
+  padding: 22px 24px;
+}
+
+.pageHeaderCompact h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
 .pageHeaderActions,
 .heroActions {
   display: flex;
@@ -633,37 +642,18 @@ ol {
 
 .playPage {
   display: grid;
-  gap: 24px;
-}
-
-.playHighlights {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.playHighlight {
-  display: grid;
-  gap: 8px;
-  padding: 18px 20px;
-  border-radius: 22px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.76);
-}
-
-.playHighlight strong {
-  font-size: 1rem;
-}
-
-.playHighlight span {
-  color: var(--ink-soft);
-  line-height: 1.6;
+  gap: 18px;
 }
 
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.82fr);
   gap: 24px;
+}
+
+.playLayout {
+  align-items: start;
+  grid-template-columns: minmax(0, 1.24fr) minmax(300px, 0.76fr);
 }
 
 .boardColumn,
@@ -701,6 +691,73 @@ ol {
 
 .panel {
   padding: 18px;
+}
+
+.playControlBar {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(19, 59, 92, 0.08), transparent 34%),
+    rgba(255, 255, 255, 0.94);
+}
+
+.playControlBarTop,
+.playControlMeta,
+.playControlSideChooser {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.playControlBarTop {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.playControlBarIntro {
+  display: grid;
+  gap: 8px;
+  max-width: 62ch;
+}
+
+.playControlBarIntro h2 {
+  font-size: 1.35rem;
+}
+
+.playControlBarIntro p {
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.playControlBarButton {
+  min-width: 180px;
+}
+
+.playStatusPill,
+.statusNote {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(19, 59, 92, 0.08);
+  color: var(--brand-strong);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.playStatusPillMuted {
+  background: rgba(32, 41, 58, 0.08);
+  color: var(--ink-soft);
+}
+
+.playStatusPillTheory {
+  background: rgba(193, 139, 29, 0.14);
+  color: #8a5b00;
+}
+
+.playControlLockNote {
+  background: rgba(19, 59, 92, 0.05);
 }
 
 .panel h2 {
@@ -851,7 +908,6 @@ ol {
 .infoRow span,
 .settingField span,
 .toggleRow span,
-.statusNote,
 .evalHint,
 .sideHint,
 .emptyMove,
@@ -890,13 +946,35 @@ ol {
 }
 
 .coachBox {
-  padding: 14px;
+  padding: 12px 14px;
   border-radius: 18px;
 }
 
 .coachBox h3 {
   margin-bottom: 8px;
   font-size: 1rem;
+}
+
+.coachDetails {
+  border-top: 1px solid rgba(32, 41, 58, 0.08);
+  padding-top: 12px;
+}
+
+.coachDetailsSummary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  color: var(--brand-strong);
+}
+
+.coachDetailsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.coachDetailList {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
 }
 
 .coachBoxPositive {
@@ -1011,6 +1089,11 @@ ol {
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+}
+
+.statusNoteWarning {
+  background: var(--warning-soft);
+  color: #8a5b00;
 }
 
 .resetBtn {
@@ -1207,6 +1290,16 @@ ol {
   font-weight: 700;
 }
 
+.openingMoveChipDone {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.openingMoveChipNext {
+  background: rgba(193, 139, 29, 0.16);
+  color: #8a5b00;
+}
+
 .openingChecklist li {
   margin-bottom: 4px;
 }
@@ -1371,6 +1464,14 @@ ol {
     grid-template-columns: 1fr;
   }
 
+  .playControlBarTop {
+    flex-direction: column;
+  }
+
+  .playControlBarButton {
+    width: 100%;
+  }
+
   .coachPreviewHeader,
   .coachSummary,
   .infoRow,
@@ -1407,6 +1508,11 @@ ol {
 
   .boardWrap {
     padding: 10px;
+  }
+
+  .playControlMeta,
+  .playControlSideChooser {
+    width: 100%;
   }
 
   .openingMoveChip {

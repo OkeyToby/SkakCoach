@@ -70,20 +70,25 @@ export default function CoachPanel({
         </strong>
       </div>
 
-      <div className="coachBox coachBoxPositive">
-        <h3>Fordel ved dit træk</h3>
-        <p>{explanation.advantage}</p>
-      </div>
+      <details className="coachDetails">
+        <summary className="coachDetailsSummary">Detaljer om dit seneste træk</summary>
+        <div className="coachDetailList">
+          <div className="coachBox coachBoxPositive">
+            <h3>Fordel ved dit træk</h3>
+            <p>{explanation.advantage}</p>
+          </div>
 
-      <div className="coachBox coachBoxWarning">
-        <h3>Ulempe ved dit træk</h3>
-        <p>{explanation.drawback}</p>
-      </div>
+          <div className="coachBox coachBoxWarning">
+            <h3>Ulempe ved dit træk</h3>
+            <p>{explanation.drawback}</p>
+          </div>
 
-      <div className="coachBox coachBoxIdea">
-        <h3>Bedre mulighed</h3>
-        <p>{explanation.betterMove}</p>
-      </div>
+          <div className="coachBox coachBoxIdea">
+            <h3>Bedre mulighed</h3>
+            <p>{explanation.betterMove}</p>
+          </div>
+        </div>
+      </details>
     </AccordionPanel>
   );
 }

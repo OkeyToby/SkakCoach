@@ -1,3 +1,4 @@
+import type { Move } from 'chess.js';
 import type { Opening } from '@/data/openings/openings';
 
 export type OpeningTheoryState = {
@@ -6,34 +7,41 @@ export type OpeningTheoryState = {
   isInTheory: boolean;
   hasLeftTheory: boolean;
   isComplete: boolean;
-  nextExpectedMove: string | null;
+  nextExpectedMoveSan: string | null;
+  nextExpectedMoveUci: string | null;
 };
 
 export function getOpeningSideChoice(opening: Opening): 'white' | 'black' {
   return opening.side === 'hvid' ? 'white' : 'black';
 }
 
-export function getOpeningTheoryState(opening: Opening, history: string[]): OpeningTheoryState {
+function moveToUci(move: Pick<Move, 'from' | 'to' | 'promotion'>): string {
+  return `${move.from}${move.to}${move.promotion ?? ''}`;
+}
+
+export function getOpeningTheoryState(opening: Opening, history: Move[]): OpeningTheoryState {
   let matchedMoves = 0;
+  const historyUci = history.map((move) => moveToUci(move));
 
   while (
-    matchedMoves < history.length &&
-    matchedMoves < opening.starterMoves.length &&
-    history[matchedMoves] === opening.starterMoves[matchedMoves]
+    matchedMoves < historyUci.length &&
+    matchedMoves < opening.starterMovesUci.length &&
+    historyUci[matchedMoves] === opening.starterMovesUci[matchedMoves]
   ) {
     matchedMoves += 1;
   }
 
-  const hasLeftTheory = history.length > matchedMoves;
-  const isComplete = !hasLeftTheory && matchedMoves >= opening.starterMoves.length;
-  const isInTheory = !hasLeftTheory && matchedMoves < opening.starterMoves.length;
+  const hasLeftTheory = historyUci.length > matchedMoves;
+  const isComplete = !hasLeftTheory && matchedMoves >= opening.starterMovesUci.length;
+  const isInTheory = !hasLeftTheory && matchedMoves < opening.starterMovesUci.length;
 
   return {
     matchedMoves,
-    totalMoves: opening.starterMoves.length,
+    totalMoves: opening.starterMovesUci.length,
     isInTheory,
     hasLeftTheory,
     isComplete,
-    nextExpectedMove: isInTheory ? opening.starterMoves[matchedMoves] ?? null : null,
+    nextExpectedMoveSan: isInTheory ? opening.starterMoves[matchedMoves] ?? null : null,
+    nextExpectedMoveUci: isInTheory ? opening.starterMovesUci[matchedMoves] ?? null : null,
   };
 }

@@ -11,8 +11,9 @@ import MoveHistory from '@/components/MoveHistory';
 import SettingsPanel from '@/components/SettingsPanel';
 import PageHeader from '@/components/layout/PageHeader';
 import OpeningContextPanel from '@/components/play/OpeningContextPanel';
+import PlayControlBar from '@/components/play/PlayControlBar';
 import Button from '@/components/ui/Button';
-import { getOpeningBySlug } from '@/data/openings/openings';
+import { getOpeningBySlug, type Opening } from '@/data/openings/openings';
 import {
   buildPreMoveCoach,
   explainMove,
@@ -24,6 +25,7 @@ import { useEngine } from '@/lib/engine/useEngine';
 import {
   getOpeningSideChoice,
   getOpeningTheoryState,
+  type OpeningTheoryState,
 } from '@/lib/openings/openingTheoryHelpers';
 import { recordOpeningPlaySession } from '@/lib/openings/openingProgressHelpers';
 import { updateOpeningsProgress } from '@/lib/openings/openingProgressStorage';
@@ -228,28 +230,65 @@ function isStoredSettings(value: unknown): value is StoredSettings {
   );
 }
 
-const playHighlights = [
-  {
-    title: 'Før dit træk',
-    description: 'Coach viser kandidattræk og en kort plan, før du beslutter dig.',
-  },
-  {
-    title: 'Efter dit træk',
-    description: 'Du får konkret feedback på fordel, ulempe og et stærkere alternativ.',
-  },
-  {
-    title: 'Undervejs',
-    description: 'Tempo, styrke, stemme og tema kan tilpasses uden at forlade siden.',
-  },
-  {
-    title: 'Profilen følger med',
-    description: 'Afsluttede partier tæller automatisk i XP, streak, partier spillet og sejre.',
-  },
-];
-
 type Props = {
   openingSlug?: string;
 };
+
+function getOpeningStatusLabel(
+  theoryState: OpeningTheoryState | null,
+  hasStarted: boolean,
+): string | null {
+  if (!theoryState) return null;
+  if (!hasStarted) return 'Åbning klar';
+  if (theoryState.hasLeftTheory) return 'Ude af teori';
+  if (theoryState.isComplete) return 'Starterlinje færdig';
+  return `Teori ${theoryState.matchedMoves}/${theoryState.totalMoves}`;
+}
+
+function getOpeningBoardNote(
+  theoryState: OpeningTheoryState | null,
+  hasStarted: boolean,
+): string | null {
+  if (!theoryState) return null;
+  if (!hasStarted) return 'Åbningstræningen følger starterlinjen fra første træk.';
+  if (theoryState.hasLeftTheory) {
+    return 'Nu er du ude af den kendte teori. SkakCoach skifter til almindelig parti-coach.';
+  }
+  if (theoryState.isComplete) {
+    return 'Starterlinjen er gennemført. Partiet fortsætter nu som almindelig træning.';
+  }
+  return `Du er stadig i teorien: ${theoryState.matchedMoves}/${theoryState.totalMoves} træk matcher linjen.`;
+}
+
+function getCoachStatusLabel(
+  hasStarted: boolean,
+  isComputerThinking: boolean,
+  isPreparingCoach: boolean,
+): string {
+  if (!hasStarted) return 'Coach klar ved start';
+  if (isComputerThinking) return 'Computeren tænker';
+  if (isPreparingCoach) return 'Coach analyserer';
+  return 'Coach klar til dit træk';
+}
+
+function getTheoryReply(
+  opening: Opening | undefined,
+  historyVerbose: Move[],
+): { san: string | null; uci: string } | null {
+  if (!opening) {
+    return null;
+  }
+
+  const theoryState = getOpeningTheoryState(opening, historyVerbose);
+  if (!theoryState.isInTheory || !theoryState.nextExpectedMoveUci) {
+    return null;
+  }
+
+  return {
+    san: theoryState.nextExpectedMoveSan,
+    uci: theoryState.nextExpectedMoveUci,
+  };
+}
 
 export default function PlayExperience({ openingSlug }: Props) {
   const [game, setGame] = useState(() => new Chess());
@@ -279,14 +318,21 @@ export default function PlayExperience({ openingSlug }: Props) {
   const { analyzeFen, isReady } = useEngine();
   const opening = openingSlug ? getOpeningBySlug(openingSlug) : undefined;
   const openingSideChoice = opening ? getOpeningSideChoice(opening) : null;
+  const historyVerbose = game.history({ verbose: true }) as Move[];
 
   const boardTheme = boardThemes[theme];
   const analysisDepth = difficultyDepth[difficulty];
   const moveDelay = tempoDelay[tempo];
-  const openingTheoryState = opening ? getOpeningTheoryState(opening, game.history()) : null;
+  const openingTheoryState = opening ? getOpeningTheoryState(opening, historyVerbose) : null;
+  const openingStatusLabel = getOpeningStatusLabel(openingTheoryState, hasStarted);
+  const openingBoardNote = getOpeningBoardNote(openingTheoryState, hasStarted);
+  const coachStatusLabel = getCoachStatusLabel(hasStarted, isComputerThinking, isPreparingCoach);
   const boardDisabled =
     !hasStarted || !isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver();
   const openingHref = opening ? (`/openings/${opening.slug}` as Route) : null;
+  const lockedSideReason = opening
+    ? `Du øver ${opening.name} og spiller derfor ${opening.side}. Åbn /play uden åbning for frit sidevalg.`
+    : null;
   const lastEngineMoveStyles: Record<string, CSSProperties> =
     lastEngineMove === null
       ? {}
@@ -368,22 +414,19 @@ export default function PlayExperience({ openingSlug }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!openingSideChoice) {
-      return;
-    }
-
     computerTaskIdRef.current += 1;
-    const previewColor = getPreviewColor(openingSideChoice);
+    const nextChoice = openingSideChoice ?? 'white';
+    const previewColor = getPreviewColor(nextChoice);
     coachFenRef.current = '';
     computerFenRef.current = '';
     completedGameFenRef.current = '';
     lastSpokenMessageRef.current = '';
-    setPlayerSideChoice(openingSideChoice);
+    setPlayerSideChoice(nextChoice);
     setPlayerColor(previewColor);
     setHasStarted(false);
     setGame(new Chess());
     setCoachText(defaultExplanation);
-    setPreMoveCoach(getSetupCoach(openingSideChoice));
+    setPreMoveCoach(getSetupCoach(nextChoice));
     setCurrentEvaluation(null);
     setLastEngineMove(null);
     setIsPreparingCoach(false);
@@ -473,14 +516,13 @@ export default function PlayExperience({ openingSlug }: Props) {
         const next = new Chess(currentFen);
 
         try {
-          const currentTheoryState = opening ? getOpeningTheoryState(opening, game.history()) : null;
-          const expectedTheoryMove = currentTheoryState?.isInTheory ? currentTheoryState.nextExpectedMove : null;
+          const theoryReply = getTheoryReply(opening, game.history({ verbose: true }) as Move[]);
 
-          if (expectedTheoryMove) {
+          if (theoryReply) {
             await delay(Math.min(moveDelay, 500));
             if (computerTaskIdRef.current !== taskId) return;
 
-            const theoryMove = next.move(expectedTheoryMove);
+            const theoryMove = applyUciMove(next, theoryReply.uci);
             if (theoryMove) {
               setLastEngineMove([theoryMove.from, theoryMove.to]);
               return;
@@ -608,7 +650,11 @@ export default function PlayExperience({ openingSlug }: Props) {
       const beforeAnalysis = await analyzeFen(before.fen(), analysisDepth, 3);
       const afterAnalysis = await analyzeFen(afterPlayerMove.fen(), analysisDepth);
       const suggestedMovesBefore = extractSuggestedMoves(before.fen(), beforeAnalysis.topMoves);
-      const opponentReplySan = uciToSan(afterPlayerMove, afterAnalysis.bestMove);
+      const theoryReply = getTheoryReply(
+        opening,
+        afterPlayerMove.history({ verbose: true }) as Move[],
+      );
+      const opponentReplySan = theoryReply?.san ?? uciToSan(afterPlayerMove, afterAnalysis.bestMove);
       const engineBestMoveSan = uciToSan(before, beforeAnalysis.bestMove) ?? suggestedMovesBefore[0];
 
       setCurrentEvaluation(afterAnalysis.evaluation);
@@ -629,7 +675,27 @@ export default function PlayExperience({ openingSlug }: Props) {
 
       if (!afterPlayerMove.isGameOver()) {
         await delay(moveDelay);
-        if (afterAnalysis.bestMove) {
+        if (theoryReply) {
+          const appliedTheoryMove = applyUciMove(afterPlayerMove, theoryReply.uci);
+          if (appliedTheoryMove) {
+            setLastEngineMove([appliedTheoryMove.from, appliedTheoryMove.to]);
+          } else if (afterAnalysis.bestMove) {
+            const applied = applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
+            if (applied) {
+              setLastEngineMove([applied.from, applied.to]);
+            } else {
+              const fallback = playFallbackReply(afterPlayerMove);
+              if (fallback) {
+                setLastEngineMove([fallback.from, fallback.to]);
+              }
+            }
+          } else {
+            const fallback = playFallbackReply(afterPlayerMove);
+            if (fallback) {
+              setLastEngineMove([fallback.from, fallback.to]);
+            }
+          }
+        } else if (afterAnalysis.bestMove) {
           const applied = applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
           if (applied) {
             setLastEngineMove([applied.from, applied.to]);
@@ -652,9 +718,26 @@ export default function PlayExperience({ openingSlug }: Props) {
     } catch {
       if (!afterPlayerMove.isGameOver()) {
         await delay(Math.max(200, moveDelay - 150));
-        const fallback = playFallbackReply(afterPlayerMove);
-        if (fallback) {
-          setLastEngineMove([fallback.from, fallback.to]);
+        const theoryReply = getTheoryReply(
+          opening,
+          afterPlayerMove.history({ verbose: true }) as Move[],
+        );
+
+        if (theoryReply) {
+          const appliedTheoryMove = applyUciMove(afterPlayerMove, theoryReply.uci);
+          if (appliedTheoryMove) {
+            setLastEngineMove([appliedTheoryMove.from, appliedTheoryMove.to]);
+          } else {
+            const fallback = playFallbackReply(afterPlayerMove);
+            if (fallback) {
+              setLastEngineMove([fallback.from, fallback.to]);
+            }
+          }
+        } else {
+          const fallback = playFallbackReply(afterPlayerMove);
+          if (fallback) {
+            setLastEngineMove([fallback.from, fallback.to]);
+          }
         }
       }
 
@@ -724,12 +807,13 @@ export default function PlayExperience({ openingSlug }: Props) {
   return (
     <div className="playPage">
       <PageHeader
+        className="pageHeaderCompact"
         eyebrow={opening ? 'Åbningsspil mod computeren' : 'Spil mod computeren'}
         title="Spil, forstå og forbedr dig"
         description={
           opening
-            ? `Du øver ${opening.name}. Så længe du bliver i starterlinjen, følger computeren den kendte teori, og derefter fortsætter SkakCoach som almindelig parti-coach.`
-            : 'Få forslag før dit træk, forklaringer efter dit træk og en dansk coach, der hjælper dig med at se planen i stillingen.'
+            ? `Du øver ${opening.name}. Start ved brættet, følg den kendte teori og fortsæt derefter med almindelig parti-coach.`
+            : 'Start hurtigt ved brættet, få forslag før dit træk og kompakt feedback undervejs.'
         }
         actions={
           opening && openingHref ? (
@@ -754,17 +838,21 @@ export default function PlayExperience({ openingSlug }: Props) {
         }
       />
 
-      <div className="playHighlights">
-        {playHighlights.map((highlight) => (
-          <div key={highlight.title} className="playHighlight">
-            <strong>{highlight.title}</strong>
-            <span>{highlight.description}</span>
-          </div>
-        ))}
-      </div>
-
       <div className="page playLayout">
         <section className="boardColumn">
+          <PlayControlBar
+            coachStatus={coachStatusLabel}
+            hasStarted={hasStarted}
+            isReady={isReady}
+            isComputerThinking={isComputerThinking}
+            lockedSideReason={lockedSideReason}
+            openingStatus={openingStatusLabel}
+            playerColor={playerColor}
+            sideChoice={playerSideChoice}
+            onSideChange={prepareGame}
+            onStartGame={startGame}
+          />
+
           <div className="boardPanel">
             <div className="boardStage">
               <ChessBoard
@@ -782,6 +870,13 @@ export default function PlayExperience({ openingSlug }: Props) {
                 {!isReady && <p className="statusNote">Stockfish starter…</p>}
                 {!hasStarted && isReady && <p className="statusNote">Tryk Start parti for at begynde.</p>}
                 {isComputerThinking && <p className="thinking">Computeren tænker…</p>}
+                {openingBoardNote ? (
+                  <p
+                    className={`statusNote${openingTheoryState?.hasLeftTheory ? ' statusNoteWarning' : ''}`}
+                  >
+                    {openingBoardNote}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -805,17 +900,8 @@ export default function PlayExperience({ openingSlug }: Props) {
           <GameInfo
             game={game}
             hasStarted={hasStarted}
-            isReady={isReady}
-            isComputerThinking={isComputerThinking}
-            lockedSideReason={
-              opening
-                ? `Du øver ${opening.name} og spiller derfor ${opening.side}. Åbn /play uden opening for frit sidevalg.`
-                : null
-            }
+            openingName={opening?.name}
             playerColor={playerColor}
-            sideChoice={playerSideChoice}
-            onSideChange={prepareGame}
-            onStartGame={startGame}
           />
           <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
           <MoveHistory moves={game.history()} />

@@ -37,13 +37,14 @@ function getStatusMessage(theoryState: OpeningTheoryState, hasStarted: boolean):
     return 'Du har gennemført hele starterlinjen. Herfra fortsætter partiet som almindelig træning.';
   }
 
-  return theoryState.nextExpectedMove
-    ? `Du er stadig i teorien. Det næste kendte træk i linjen er ${theoryState.nextExpectedMove}.`
+  return theoryState.nextExpectedMoveSan
+    ? `Du er stadig i teorien. Det næste kendte træk i linjen er ${theoryState.nextExpectedMoveSan}.`
     : 'Du er stadig i den kendte teori.';
 }
 
 export default function OpeningContextPanel({ opening, theoryState, hasStarted }: Props) {
-  const progressPercentage = Math.round((theoryState.matchedMoves / theoryState.totalMoves) * 100);
+  const progressPercentage =
+    theoryState.totalMoves === 0 ? 0 : Math.round((theoryState.matchedMoves / theoryState.totalMoves) * 100);
 
   return (
     <AccordionPanel
@@ -78,6 +79,28 @@ export default function OpeningContextPanel({ opening, theoryState, hasStarted }
       <div className={`openingTheoryNote${theoryState.hasLeftTheory ? ' openingTheoryNoteWarn' : ''}`}>
         <strong>Status</strong>
         <p>{getStatusMessage(theoryState, hasStarted)}</p>
+      </div>
+
+      <div className="openingMoveTrack">
+        {opening.starterMoves.map((move, index) => {
+          const isMatched = index < theoryState.matchedMoves;
+          const isNext = hasStarted && theoryState.isInTheory && index === theoryState.matchedMoves;
+
+          return (
+            <span
+              key={`${move}-${index}`}
+              className={[
+                'openingMoveChip',
+                isMatched ? 'openingMoveChipDone' : '',
+                isNext ? 'openingMoveChipNext' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {move}
+            </span>
+          );
+        })}
       </div>
 
       <div className="openingLinePreview">{formatOpeningLine(opening.starterMoves)}</div>
