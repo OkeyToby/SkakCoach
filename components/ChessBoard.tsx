@@ -6,10 +6,16 @@ import { Chessboard } from 'react-chessboard';
 type Props = {
   position: string;
   onMove: (from: string, to: string) => Promise<boolean> | boolean;
+  boardOrientation?: 'white' | 'black';
   disabled?: boolean;
 };
 
-export default function ChessBoard({ position, onMove, disabled = false }: Props) {
+export default function ChessBoard({
+  position,
+  onMove,
+  boardOrientation = 'white',
+  disabled = false,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [boardWidth, setBoardWidth] = useState(560);
 
@@ -31,7 +37,7 @@ export default function ChessBoard({ position, onMove, disabled = false }: Props
       <Chessboard
         id="SkakCoachBoard"
         position={position}
-        boardOrientation="white"
+        boardOrientation={boardOrientation}
         boardWidth={boardWidth}
         arePiecesDraggable={!disabled}
         customDarkSquareStyle={{ backgroundColor: '#8ea1b5' }}

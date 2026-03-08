@@ -92,6 +92,54 @@ h1 {
   font-size: 1.05rem;
 }
 
+.coachPreview {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #eef5ff;
+  border: 1px solid #d8e7fb;
+}
+
+.coachPreviewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.coachPreviewHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.coachPreview p {
+  margin: 10px 0 0;
+  line-height: 1.55;
+}
+
+.coachStatus {
+  color: #1d4ed8;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.suggestedMoves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.suggestedMove {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
 .coachSummary {
   display: flex;
   justify-content: space-between;
@@ -157,6 +205,40 @@ h1 {
 
 .infoRow strong {
   text-align: right;
+}
+
+.sideHint {
+  margin: 14px 0 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.sideChooser {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sideOption {
+  border: 1px solid #d6d3d1;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.sideOption:hover {
+  border-color: #8ea1b5;
+}
+
+.sideOptionActive {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
 }
 
 .coachBox {
@@ -251,5 +333,12 @@ h1 {
   .boardWrap {
     max-width: 100%;
     padding: 10px;
+  }
+
+  .coachPreviewHeader,
+  .coachSummary,
+  .infoRow {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

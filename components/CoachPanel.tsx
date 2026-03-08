@@ -1,8 +1,9 @@
+import { type MoveExplanation, type PreMoveCoach } from '@/lib/explainMove';
+
 type Props = {
-  classification: string;
-  advantage: string;
-  drawback: string;
-  betterMove: string;
+  explanation: MoveExplanation;
+  preMoveCoach: PreMoveCoach;
+  isPreparing: boolean;
 };
 
 function getClassificationClass(classification: string): string {
@@ -14,28 +15,50 @@ function getClassificationClass(classification: string): string {
   return 'coachBadge coachBadgeGood';
 }
 
-export default function CoachPanel({ classification, advantage, drawback, betterMove }: Props) {
+export default function CoachPanel({ explanation, preMoveCoach, isPreparing }: Props) {
   return (
     <div className="panel">
       <h2>SkakCoach</h2>
+
+      <div className="coachPreview">
+        <div className="coachPreviewHeader">
+          <h3>Bedste træk før du rykker</h3>
+          {isPreparing && <span className="coachStatus">Analyserer…</span>}
+        </div>
+        <p>{preMoveCoach.summary}</p>
+        {preMoveCoach.suggestedMoves.length > 0 && (
+          <ul className="suggestedMoves">
+            {preMoveCoach.suggestedMoves.map((move) => (
+              <li key={move} className="suggestedMove">
+                {move}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p>{preMoveCoach.plan}</p>
+        {preMoveCoach.caution && <p>{preMoveCoach.caution}</p>}
+      </div>
+
       <div className="coachSummary">
         <span>Vurdering</span>
-        <strong className={getClassificationClass(classification)}>{classification}</strong>
+        <strong className={getClassificationClass(explanation.classification)}>
+          {explanation.classification}
+        </strong>
       </div>
 
       <div className="coachBox coachBoxPositive">
         <h3>Fordel ved dit træk</h3>
-        <p>{advantage}</p>
+        <p>{explanation.advantage}</p>
       </div>
 
       <div className="coachBox coachBoxWarning">
         <h3>Ulempe ved dit træk</h3>
-        <p>{drawback}</p>
+        <p>{explanation.drawback}</p>
       </div>
 
       <div className="coachBox coachBoxIdea">
         <h3>Bedre mulighed</h3>
-        <p>{betterMove}</p>
+        <p>{explanation.betterMove}</p>
       </div>
     </div>
   );

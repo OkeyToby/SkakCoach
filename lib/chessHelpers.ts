@@ -20,8 +20,10 @@ export function getGameStatus(chess: Chess): string {
   return 'Partiet er i gang';
 }
 
-export function getTurnLabel(chess: Chess): string {
-  return chess.turn() === 'w' ? 'Hvid' : 'Sort';
+export function getTurnLabel(turn: Color, playerColor?: Color): string {
+  const label = turn === 'w' ? 'Hvid' : 'Sort';
+  if (!playerColor) return label;
+  return turn === playerColor ? `${label} (dig)` : `${label} (computer)`;
 }
 
 export function isCenterSquare(square?: string): boolean {
@@ -85,8 +87,10 @@ function findKingSquare(chess: Chess, color: Color): Square | null {
 
 export function hasCastled(chess: Chess, color: Color): boolean {
   const kingSquare = findKingSquare(chess, color);
-  if (color === 'w') return kingSquare === 'g1' || kingSquare === 'c1';
-  return kingSquare === 'g8' || kingSquare === 'c8';
+  if (!kingSquare) return false;
+  return color === 'w'
+    ? kingSquare === 'g1' || kingSquare === 'c1'
+    : kingSquare === 'g8' || kingSquare === 'c8';
 }
 
 function isSquareDefended(chess: Chess, square: Square, color: Color): boolean {
@@ -138,7 +142,8 @@ export function applyUciMove(chess: Chess, uciMove: string): Move | null {
   }
 }
 
-export function uciToSan(chess: Chess, uciMove: string): string | undefined {
+export function uciToSan(chess: Chess, uciMove?: string): string | undefined {
+  if (!uciMove) return undefined;
   const clone = new Chess(chess.fen());
   return applyUciMove(clone, uciMove)?.san;
 }

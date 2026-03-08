@@ -1,6 +1,14 @@
+export type EngineTopMove = {
+  multiPv: number;
+  evaluation: number | null;
+  move: string;
+  pv: string;
+};
+
 export type EngineSnapshot = {
   bestMove: string;
   evaluation: number | null;
+  topMoves: EngineTopMove[];
 };
 
 export type ParsedEngineLine =
@@ -8,8 +16,11 @@ export type ParsedEngineLine =
       kind: 'ready';
     }
   | {
-      kind: 'evaluation';
-      evaluation: number;
+      kind: 'info';
+      multiPv: number;
+      evaluation: number | null;
+      move?: string;
+      pv?: string;
     }
   | {
       kind: 'bestmove';
@@ -19,6 +30,7 @@ export type ParsedEngineLine =
 export const EMPTY_ENGINE_SNAPSHOT: EngineSnapshot = {
   bestMove: '',
   evaluation: null,
+  topMoves: [],
 };
 
 function mateToEvaluation(mate: number): number {
@@ -34,20 +46,30 @@ export function parseEngineLine(rawLine: string): ParsedEngineLine | null {
     return { kind: 'ready' };
   }
 
-  const mateMatch = line.match(/score mate (-?\d+)/);
-  if (mateMatch) {
-    return {
-      kind: 'evaluation',
-      evaluation: mateToEvaluation(Number(mateMatch[1])),
-    };
-  }
+  if (line.startsWith('info')) {
+    const multiPvMatch = line.match(/ multipv (\d+)/);
+    const cpMatch = line.match(/score cp (-?\d+)/);
+    const mateMatch = line.match(/score mate (-?\d+)/);
+    const pvMatch = line.match(/ pv (.+)$/);
+    const multiPv = multiPvMatch ? Number(multiPvMatch[1]) : 1;
 
-  const cpMatch = line.match(/score cp (-?\d+)/);
-  if (cpMatch) {
-    return {
-      kind: 'evaluation',
-      evaluation: Number(cpMatch[1]),
-    };
+    if (cpMatch || mateMatch || pvMatch) {
+      const evaluation = mateMatch
+        ? mateToEvaluation(Number(mateMatch[1]))
+        : cpMatch
+          ? Number(cpMatch[1])
+          : null;
+      const pv = pvMatch?.[1];
+      const move = pv?.split(/\s+/)[0];
+
+      return {
+        kind: 'info',
+        multiPv,
+        evaluation,
+        move,
+        pv,
+      };
+    }
   }
 
   if (line.startsWith('bestmove')) {

@@ -1,14 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { Chess } from 'chess.js';
+import { useEffect, useRef, useState } from 'react';
+import { Chess, type Color } from 'chess.js';
 import ChessBoard from '@/components/ChessBoard';
 import CoachPanel from '@/components/CoachPanel';
 import GameInfo from '@/components/GameInfo';
 import MoveHistory from '@/components/MoveHistory';
-import { explainMove, type MoveExplanation } from '@/lib/explainMove';
+import {
+  buildPreMoveCoach,
+  explainMove,
+  type MoveExplanation,
+  type PreMoveCoach,
+} from '@/lib/explainMove';
 import { applyUciMove, uciToSan } from '@/lib/chessHelpers';
 import { useEngine } from '@/lib/engine/useEngine';
+
+type PlayerSideChoice = 'white' | 'black' | 'random';
 
 const defaultExplanation: MoveExplanation = {
   classification: 'Afventer træk',
@@ -16,6 +23,14 @@ const defaultExplanation: MoveExplanation = {
   drawback: 'Ingen vurdering endnu.',
   betterMove: 'Kæmp gerne om centrum tidligt og tænk på rokade.',
 };
+
+function resolvePlayerColor(choice: PlayerSideChoice): Color {
+  if (choice === 'random') {
+    return Math.random() < 0.5 ? 'w' : 'b';
+  }
+
+  return choice === 'white' ? 'w' : 'b';
+}
 
 function playFallbackReply(game: Chess) {
   const replies = game.moves({ verbose: true });
@@ -29,14 +44,166 @@ function playFallbackReply(game: Chess) {
   });
 }
 
+function getPendingCoach(playerColor: Color): PreMoveCoach {
+  return {
+    suggestedMoves: [],
+    summary: 'Jeg analyserer de bedste træk for dig.',
+    plan:
+      playerColor === 'w'
+        ? 'Du starter partiet. Vent et øjeblik og se coachens forslag før du rykker.'
+        : 'Computeren starter som hvid. Derefter viser coachen de bedste svar for dig.',
+    caution: '',
+  };
+}
+
+function getComputerThinkingCoach(): PreMoveCoach {
+  return {
+    suggestedMoves: [],
+    summary: 'Computeren overvejer sit svar.',
+    plan: 'Så snart modstanderen har rykket, opdaterer coachen dine bedste muligheder.',
+    caution: '',
+  };
+}
+
+function getGameOverCoach(): PreMoveCoach {
+  return {
+    suggestedMoves: [],
+    summary: 'Partiet er slut.',
+    plan: 'Start et nyt parti for at få nye forslag fra coachen.',
+    caution: '',
+  };
+}
+
+function getFallbackPreMoveCoach(): PreMoveCoach {
+  return {
+    suggestedMoves: [],
+    summary: 'Jeg kunne ikke hente nye forslag lige nu.',
+    plan: 'Spil enkelt: udvikl dine officerer, kæmp om centrum og rokér i god tid.',
+    caution: '',
+  };
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function extractSuggestedMoves(
+  fen: string,
+  topMoves: Array<{ move?: string }>,
+): string[] {
+  return topMoves
+    .map((line) => (line.move ? uciToSan(new Chess(fen), line.move) : undefined))
+    .filter((move): move is string => Boolean(move));
+}
+
 export default function Page() {
   const [game, setGame] = useState(() => new Chess());
   const [coachText, setCoachText] = useState<MoveExplanation>(defaultExplanation);
+  const [preMoveCoach, setPreMoveCoach] = useState<PreMoveCoach>(() => getPendingCoach('w'));
   const [isComputerThinking, setIsComputerThinking] = useState(false);
+  const [isPreparingCoach, setIsPreparingCoach] = useState(false);
+  const [playerSideChoice, setPlayerSideChoice] = useState<PlayerSideChoice>('white');
+  const [playerColor, setPlayerColor] = useState<Color>('w');
+  const coachFenRef = useRef('');
+  const computerFenRef = useRef('');
   const { analyzeFen, isReady } = useEngine();
 
+  useEffect(() => {
+    if (!isReady || isComputerThinking) return;
+
+    const currentFen = game.fen();
+
+    if (game.isGameOver()) {
+      setIsPreparingCoach(false);
+      setPreMoveCoach(getGameOverCoach());
+      coachFenRef.current = currentFen;
+      computerFenRef.current = '';
+      return;
+    }
+
+    if (game.turn() !== playerColor) {
+      if (computerFenRef.current === currentFen) return;
+
+      let cancelled = false;
+      computerFenRef.current = currentFen;
+      coachFenRef.current = '';
+      setIsPreparingCoach(false);
+      setIsComputerThinking(true);
+      setPreMoveCoach(getComputerThinkingCoach());
+
+      void (async () => {
+        const next = new Chess(currentFen);
+
+        try {
+          const analysis = await analyzeFen(currentFen, 12);
+          if (cancelled) return;
+
+          if (analysis.bestMove) {
+            await delay(600);
+            if (cancelled) return;
+            applyUciMove(next, analysis.bestMove);
+          } else {
+            playFallbackReply(next);
+          }
+        } catch {
+          if (cancelled) return;
+          playFallbackReply(next);
+        } finally {
+          if (!cancelled) {
+            computerFenRef.current = '';
+            setGame(new Chess(next.fen()));
+            setIsComputerThinking(false);
+          }
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (coachFenRef.current === currentFen) return;
+
+    let cancelled = false;
+    coachFenRef.current = currentFen;
+    computerFenRef.current = '';
+    setIsPreparingCoach(true);
+    setPreMoveCoach(getPendingCoach(playerColor));
+
+    void (async () => {
+      try {
+        const analysis = await analyzeFen(currentFen, 12, 3);
+        if (cancelled) return;
+
+        setPreMoveCoach(
+          buildPreMoveCoach({
+            position: new Chess(currentFen),
+            playerColor,
+            suggestedMoves: extractSuggestedMoves(currentFen, analysis.topMoves),
+          }),
+        );
+      } catch {
+        if (!cancelled) {
+          setPreMoveCoach(getFallbackPreMoveCoach());
+        }
+      } finally {
+        if (!cancelled) {
+          setIsPreparingCoach(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analyzeFen, game, isComputerThinking, isReady, playerColor]);
+
   async function onPlayerMove(from: string, to: string) {
-    if (!isReady || isComputerThinking || game.turn() !== 'w' || game.isGameOver()) return false;
+    if (!isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()) {
+      return false;
+    }
 
     const before = new Chess(game.fen());
     const afterPlayerMove = new Chess(game.fen());
@@ -51,10 +218,19 @@ export default function Page() {
     if (!move) return false;
 
     setGame(new Chess(afterPlayerMove.fen()));
+    setIsPreparingCoach(false);
     setIsComputerThinking(true);
+    coachFenRef.current = '';
+    computerFenRef.current = '';
+    setPreMoveCoach({
+      suggestedMoves: [],
+      summary: 'Jeg vurderer dit træk.',
+      plan: 'Om lidt får du feedback på trækket og derefter nye forslag til næste tur.',
+      caution: '',
+    });
 
     try {
-      const beforeAnalysis = await analyzeFen(before.fen(), 12);
+      const beforeAnalysis = await analyzeFen(before.fen(), 12, 3);
       const afterAnalysis = await analyzeFen(afterPlayerMove.fen(), 12);
 
       setCoachText(
@@ -63,20 +239,27 @@ export default function Page() {
           before,
           after: afterPlayerMove,
           history: before.history(),
-          engineBestMoveSan: uciToSan(before, beforeAnalysis.bestMove),
+          playerColor,
+          engineBestMoveSan: extractSuggestedMoves(before.fen(), beforeAnalysis.topMoves)[0],
           evalBeforeCp: beforeAnalysis.evaluation,
           evalAfterCp: afterAnalysis.evaluation,
         }),
       );
 
-      if (!afterPlayerMove.isGameOver() && afterAnalysis.bestMove) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
-        setGame(new Chess(afterPlayerMove.fen()));
+      if (!afterPlayerMove.isGameOver()) {
+        await delay(600);
+        if (afterAnalysis.bestMove) {
+          applyUciMove(afterPlayerMove, afterAnalysis.bestMove);
+        } else {
+          playFallbackReply(afterPlayerMove);
+        }
       }
+
+      setGame(new Chess(afterPlayerMove.fen()));
       return true;
     } catch {
       if (!afterPlayerMove.isGameOver()) {
+        await delay(400);
         playFallbackReply(afterPlayerMove);
       }
 
@@ -86,18 +269,26 @@ export default function Page() {
           before,
           after: afterPlayerMove,
           history: before.history(),
+          playerColor,
         }),
       );
       setGame(new Chess(afterPlayerMove.fen()));
-      return false;
+      return true;
     } finally {
       setIsComputerThinking(false);
     }
   }
 
-  function resetGame() {
+  function startNewGame(nextChoice = playerSideChoice) {
+    const nextPlayerColor = resolvePlayerColor(nextChoice);
+    coachFenRef.current = '';
+    computerFenRef.current = '';
+    setPlayerSideChoice(nextChoice);
+    setPlayerColor(nextPlayerColor);
     setGame(new Chess());
     setCoachText(defaultExplanation);
+    setPreMoveCoach(getPendingCoach(nextPlayerColor));
+    setIsPreparingCoach(false);
     setIsComputerThinking(false);
   }
 
@@ -108,7 +299,8 @@ export default function Page() {
           <p className="eyebrow">Skaktræning på dansk</p>
           <h1>SkakCoach</h1>
           <p className="intro">
-            Spil med de hvide brikker mod computeren og få korte forklaringer efter hvert træk.
+            Spil som hvid, sort eller tilfældigt mod computeren og få forslag til de bedste træk,
+            før du selv rykker.
           </p>
         </div>
 
@@ -116,11 +308,12 @@ export default function Page() {
           <ChessBoard
             position={game.fen()}
             onMove={onPlayerMove}
-            disabled={!isReady || isComputerThinking || game.turn() !== 'w' || game.isGameOver()}
+            boardOrientation={playerColor === 'w' ? 'white' : 'black'}
+            disabled={!isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()}
           />
 
           <div className="boardMeta">
-            <button className="resetBtn" onClick={resetGame} type="button">
+            <button className="resetBtn" onClick={() => startNewGame()} type="button">
               Nyt parti
             </button>
             {!isReady && <p className="statusNote">Stockfish starter…</p>}
@@ -130,8 +323,17 @@ export default function Page() {
       </section>
 
       <aside className="sideColumn">
-        <GameInfo game={game} />
-        <CoachPanel {...coachText} />
+        <GameInfo
+          game={game}
+          playerColor={playerColor}
+          sideChoice={playerSideChoice}
+          onSideChange={startNewGame}
+        />
+        <CoachPanel
+          explanation={coachText}
+          preMoveCoach={preMoveCoach}
+          isPreparing={isPreparingCoach}
+        />
         <MoveHistory moves={game.history()} />
       </aside>
     </main>

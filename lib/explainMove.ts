@@ -1,4 +1,4 @@
-import { Chess, type Move } from 'chess.js';
+import { Chess, type Color, type Move } from 'chess.js';
 import {
   countCenterControl,
   countDevelopedMinorPieces,
@@ -16,17 +16,36 @@ export type MoveExplanation = {
   betterMove: string;
 };
 
+export type PreMoveCoach = {
+  suggestedMoves: string[];
+  summary: string;
+  plan: string;
+  caution: string;
+};
+
 export type ExplainInput = {
   move: Move;
   before: Chess;
   after: Chess;
   history: string[];
+  playerColor: Color;
   engineBestMoveSan?: string;
   evalBeforeCp?: number | null;
   evalAfterCp?: number | null;
 };
 
-function describeEngineIdea(before: Chess, engineBestMoveSan: string): string {
+export type PreMoveInput = {
+  position: Chess;
+  playerColor: Color;
+  suggestedMoves: string[];
+};
+
+function getPerspectiveScore(score: number | null | undefined, playerColor: Color): number | undefined {
+  if (typeof score !== 'number') return undefined;
+  return playerColor === 'w' ? score : -score;
+}
+
+function describeEngineIdea(before: Chess, engineBestMoveSan: string, playerColor: Color): string {
   const clone = new Chess(before.fen());
 
   let bestMove: Move | null = null;
@@ -46,12 +65,15 @@ function describeEngineIdea(before: Chess, engineBestMoveSan: string): string {
 
   if (
     (bestMove.piece === 'n' || bestMove.piece === 'b') &&
-    countDevelopedMinorPieces(clone, 'w') > countDevelopedMinorPieces(before, 'w')
+    countDevelopedMinorPieces(clone, playerColor) > countDevelopedMinorPieces(before, playerColor)
   ) {
     return `${engineBestMoveSan} var stærkere, fordi du udvikler en officer og gør klar til rokade.`;
   }
 
-  if (isCenterSquare(bestMove.to) || countCenterControl(clone, 'w') > countCenterControl(before, 'w')) {
+  if (
+    isCenterSquare(bestMove.to) ||
+    countCenterControl(clone, playerColor) > countCenterControl(before, playerColor)
+  ) {
     return `${engineBestMoveSan} var stærkere, fordi du kæmper mere direkte om centrum.`;
   }
 
@@ -70,25 +92,30 @@ function classifyMove(evalDrop: number): string {
 }
 
 export function explainMove(input: ExplainInput): MoveExplanation {
-  const { move, before, after, history, engineBestMoveSan, evalBeforeCp, evalAfterCp } = input;
+  const { move, before, after, history, playerColor, engineBestMoveSan, evalBeforeCp, evalAfterCp } = input;
   const moveNumber = history.length + 1;
 
-  const centerBefore = countCenterControl(before, 'w');
-  const centerAfter = countCenterControl(after, 'w');
+  const centerBefore = countCenterControl(before, playerColor);
+  const centerAfter = countCenterControl(after, playerColor);
 
-  const devBefore = countDevelopedMinorPieces(before, 'w');
-  const devAfter = countDevelopedMinorPieces(after, 'w');
+  const devBefore = countDevelopedMinorPieces(before, playerColor);
+  const devAfter = countDevelopedMinorPieces(after, playerColor);
 
-  const hangingBefore = countHangingPieces(before, 'w');
-  const hangingAfter = countHangingPieces(after, 'w');
+  const hangingBefore = countHangingPieces(before, playerColor);
+  const hangingAfter = countHangingPieces(after, playerColor);
 
-  const materialBefore = getMaterialBalance(before);
-  const materialAfter = getMaterialBalance(after);
+  const materialBefore =
+    playerColor === 'w' ? getMaterialBalance(before) : -getMaterialBalance(before);
+  const materialAfter =
+    playerColor === 'w' ? getMaterialBalance(after) : -getMaterialBalance(after);
 
+  const evalBefore = getPerspectiveScore(evalBeforeCp, playerColor);
+  const evalAfter = getPerspectiveScore(evalAfterCp, playerColor);
   const evalDrop =
-    typeof evalBeforeCp === 'number' && typeof evalAfterCp === 'number'
-      ? evalBeforeCp - evalAfterCp
+    typeof evalBefore === 'number' && typeof evalAfter === 'number'
+      ? evalBefore - evalAfter
       : 0;
+
   const classification = classifyMove(evalDrop);
 
   let advantage = 'Dit træk holder stillingen i gang, men uden en stor ændring endnu.';
@@ -104,7 +131,7 @@ export function explainMove(input: ExplainInput): MoveExplanation {
     advantage = 'God idé: du udvikler en officer og får mere aktivitet.';
   } else if (centerAfter > centerBefore || isCenterSquare(move.to)) {
     advantage = 'Fint træk: du kæmper om centrum, og det er ofte nøglen til en god stilling.';
-  } else if (move.piece === 'p' && (move.to === 'e4' || move.to === 'd4')) {
+  } else if (move.piece === 'p' && (move.to === 'e4' || move.to === 'd4' || move.to === 'e5' || move.to === 'd5')) {
     advantage = 'God plan: bonden tager plads i centrum og giver dine brikker bedre felter.';
   } else if (evalDrop < -60) {
     advantage = 'Engine kan godt lide idéen: du holder tryk og gør stillingen mere behagelig.';
@@ -121,9 +148,9 @@ export function explainMove(input: ExplainInput): MoveExplanation {
     drawback = 'Trækket er spilbart, men modstanderen får lidt nemmere spil.';
   } else if (moveNumber <= 10 && move.piece === 'q') {
     drawback = 'Tidlig dronningeudvikling kan koste tempo, fordi modstanderen kan angribe den og udvikle sig samtidig.';
-  } else if (move.piece === 'p' && (move.to === 'f3' || move.to === 'f4' || move.to === 'f6' || move.to === 'f5')) {
+  } else if (move.piece === 'p' && ['f3', 'f4', 'f5', 'f6'].includes(move.to)) {
     drawback = 'Det træk kan svække felterne foran kongen og gøre kongestillingen mere sårbar.';
-  } else if (!didCastle(move.san) && !hasCastled(after, 'w') && moveNumber >= 8 && devAfter === devBefore) {
+  } else if (!didCastle(move.san) && !hasCastled(after, playerColor) && moveNumber >= 8 && devAfter === devBefore) {
     drawback = 'Din konge står stadig i centrum, og du fik ikke samtidig udviklet nok.';
   } else if (devAfter === devBefore && centerAfter <= centerBefore && !move.san.includes('+')) {
     drawback = 'Trækket er lidt passivt og hjælper ikke meget med udvikling eller centrum.';
@@ -131,10 +158,10 @@ export function explainMove(input: ExplainInput): MoveExplanation {
 
   let betterMove = 'Overvej et træk der udvikler en officer, kæmper om centrum eller hjælper dig med at rokere.';
   if (engineBestMoveSan) {
-    betterMove = describeEngineIdea(before, engineBestMoveSan);
+    betterMove = describeEngineIdea(before, engineBestMoveSan, playerColor);
   } else if (hangingAfter > hangingBefore) {
     betterMove = 'En bedre mulighed var at dække din udsatte brik først og holde stillingen samlet.';
-  } else if (!hasCastled(after, 'w') && moveNumber >= 8) {
+  } else if (!hasCastled(after, playerColor) && moveNumber >= 8) {
     betterMove = 'Tænk på kongesikkerhed nu: en udvikling mod hurtig rokade ville ofte være sundere.';
   } else if (devAfter === devBefore) {
     betterMove = 'Se efter et træk der udvikler springer eller løber og sætter flere brikker i spil.';
@@ -147,5 +174,48 @@ export function explainMove(input: ExplainInput): MoveExplanation {
     advantage,
     drawback,
     betterMove,
+  };
+}
+
+export function buildPreMoveCoach(input: PreMoveInput): PreMoveCoach {
+  const { position, playerColor, suggestedMoves } = input;
+
+  const developedPieces = countDevelopedMinorPieces(position, playerColor);
+  const centerControl = countCenterControl(position, playerColor);
+  const hangingPieces = countHangingPieces(position, playerColor);
+  const kingSafe = hasCastled(position, playerColor);
+
+  let summary = 'Jeg analyserer stadig stillingen.';
+  if (suggestedMoves.length > 0) {
+    summary = `Bedste træk lige nu: ${suggestedMoves.join(', ')}.`;
+  }
+
+  let plan = 'Udvikl dine officerer og hold øje med centrum.';
+  if (hangingPieces > 0) {
+    plan = 'Få først styr på den udsatte brik, så du ikke giver modstanderen en gratis mulighed.';
+  } else if (!kingSafe && developedPieces >= 2) {
+    plan = 'Du er klar til at tænke på rokade og kongesikkerhed.';
+  } else if (centerControl < 2) {
+    plan = 'Prøv at tage mere plads i centrum med bønder eller aktive officerer.';
+  } else if (developedPieces < 2) {
+    plan = 'Fortsat udvikling er vigtigere end passive ventetræk her.';
+  } else {
+    plan = 'Se efter aktive træk mod centrum eller modstanderens konge.';
+  }
+
+  let caution = 'Undgå passive træk, der ikke forbedrer dine brikker.';
+  if (hangingPieces > 0) {
+    caution = 'Pas på: mindst en af dine brikker mangler støtte.';
+  } else if (!kingSafe && developedPieces >= 2) {
+    caution = 'Hvis kongen bliver stående i centrum for længe, kan stillingen hurtigt blive ubehagelig.';
+  } else if (centerControl === 0) {
+    caution = 'Hvis du helt slipper centrum, får modstanderen for let spil.';
+  }
+
+  return {
+    suggestedMoves,
+    summary,
+    plan,
+    caution,
   };
 }
