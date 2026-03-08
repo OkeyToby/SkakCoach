@@ -97,6 +97,63 @@ h1 {
   font-size: 1.05rem;
 }
 
+.accordionPanel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.accordionSummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 18px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.accordionSummary::-webkit-details-marker {
+  display: none;
+}
+
+.accordionSummary h2 {
+  margin: 0;
+}
+
+.accordionTitleGroup {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.accordionSummaryValue {
+  color: #6b7280;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.accordionChevron {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-right: 2px solid #6b7280;
+  border-bottom: 2px solid #6b7280;
+  transform: rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.accordionPanel[open] .accordionChevron {
+  transform: rotate(225deg);
+}
+
+.accordionBody {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px;
+  border-top: 1px solid rgba(31, 41, 55, 0.08);
+}
+
 .panelHeader {
   display: flex;
   justify-content: space-between;
@@ -106,6 +163,11 @@ h1 {
 
 .panelHeader h2 {
   margin-bottom: 0;
+}
+
+.coachActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .voiceBtn {
@@ -124,7 +186,6 @@ h1 {
 }
 
 .coachPreview {
-  margin-bottom: 14px;
   padding: 14px;
   border-radius: 14px;
   background: #eef5ff;
@@ -355,7 +416,6 @@ h1 {
 }
 
 .coachBox {
-  margin-top: 12px;
   padding: 14px;
   border-radius: 14px;
 }

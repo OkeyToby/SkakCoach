@@ -166,6 +166,19 @@ function extractSuggestedMoves(
     .filter((move): move is string => Boolean(move));
 }
 
+function cloneGameWithHistory(source: Chess): Chess {
+  const clone = new Chess();
+  const pgn = source.pgn();
+
+  if (pgn.trim()) {
+    clone.loadPgn(pgn);
+    return clone;
+  }
+
+  clone.load(source.fen());
+  return clone;
+}
+
 function buildExplanationSpeech(explanation: MoveExplanation): string {
   return [
     `Vurdering: ${explanation.classification}.`,
@@ -224,6 +237,8 @@ export default function Page() {
   const lastSpokenMessageRef = useRef('');
   const coachFenRef = useRef('');
   const computerFenRef = useRef('');
+  const computerTaskIdRef = useRef(0);
+  const isComputerThinkingRef = useRef(false);
   const { analyzeFen, isReady } = useEngine();
 
   const boardTheme = boardThemes[theme];
@@ -306,6 +321,17 @@ export default function Page() {
     );
   }, [difficulty, showCoordinates, showEvalBar, tempo, theme, voiceEnabled]);
 
+  const setComputerThinking = useCallback((value: boolean) => {
+    isComputerThinkingRef.current = value;
+    setIsComputerThinking(value);
+  }, []);
+
+  const cancelPendingComputerMove = useCallback(() => {
+    computerTaskIdRef.current += 1;
+    computerFenRef.current = '';
+    setComputerThinking(false);
+  }, [setComputerThinking]);
+
   const speakText = useCallback(
     (text: string) => {
       if (!voiceSupported || typeof window === 'undefined' || !text.trim()) return;
@@ -356,7 +382,7 @@ export default function Page() {
   }, [coachText, hasStarted, preMoveCoach, speakText]);
 
   useEffect(() => {
-    if (!hasStarted || !isReady || isComputerThinking) return;
+    if (!hasStarted || !isReady || isComputerThinkingRef.current) return;
 
     const currentFen = game.fen();
 
@@ -369,13 +395,14 @@ export default function Page() {
     }
 
     if (game.turn() !== playerColor) {
-      if (computerFenRef.current === currentFen) return;
+      if (computerFenRef.current === currentFen || isComputerThinkingRef.current) return;
 
-      let cancelled = false;
+      const taskId = computerTaskIdRef.current + 1;
+      computerTaskIdRef.current = taskId;
       computerFenRef.current = currentFen;
       coachFenRef.current = '';
       setIsPreparingCoach(false);
-      setIsComputerThinking(true);
+      setComputerThinking(true);
       setPreMoveCoach(getComputerThinkingCoach());
 
       void (async () => {
@@ -383,11 +410,11 @@ export default function Page() {
 
         try {
           const analysis = await analyzeFen(currentFen, analysisDepth);
-          if (cancelled) return;
+          if (computerTaskIdRef.current !== taskId) return;
 
           if (analysis.bestMove) {
             await delay(moveDelay);
-            if (cancelled) return;
+            if (computerTaskIdRef.current !== taskId) return;
             const applied = applyUciMove(next, analysis.bestMove);
             if (applied) {
               setLastEngineMove([applied.from, applied.to]);
@@ -404,23 +431,21 @@ export default function Page() {
             }
           }
         } catch {
-          if (cancelled) return;
+          if (computerTaskIdRef.current !== taskId) return;
           const fallback = playFallbackReply(next);
           if (fallback) {
             setLastEngineMove([fallback.from, fallback.to]);
           }
         } finally {
-          if (!cancelled) {
+          if (computerTaskIdRef.current === taskId) {
             computerFenRef.current = '';
-            setGame(new Chess(next.fen()));
-            setIsComputerThinking(false);
+            setGame(cloneGameWithHistory(next));
+            setComputerThinking(false);
           }
         }
       })();
 
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
 
     if (coachFenRef.current === currentFen) return;
@@ -458,7 +483,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [analyzeFen, analysisDepth, game, hasStarted, isComputerThinking, isReady, moveDelay, playerColor]);
+  }, [analyzeFen, analysisDepth, game, hasStarted, isReady, moveDelay, playerColor, setComputerThinking]);
 
   async function onPlayerMove(from: string, to: string) {
     if (!hasStarted || !isReady || isComputerThinking || game.turn() !== playerColor || game.isGameOver()) {
@@ -477,9 +502,9 @@ export default function Page() {
 
     if (!move) return false;
 
-    setGame(new Chess(afterPlayerMove.fen()));
+    setGame(cloneGameWithHistory(afterPlayerMove));
     setIsPreparingCoach(false);
-    setIsComputerThinking(true);
+    setComputerThinking(true);
     setLastEngineMove(null);
     coachFenRef.current = '';
     computerFenRef.current = '';
@@ -493,7 +518,9 @@ export default function Page() {
     try {
       const beforeAnalysis = await analyzeFen(before.fen(), analysisDepth, 3);
       const afterAnalysis = await analyzeFen(afterPlayerMove.fen(), analysisDepth);
+      const suggestedMovesBefore = extractSuggestedMoves(before.fen(), beforeAnalysis.topMoves);
       const opponentReplySan = uciToSan(afterPlayerMove, afterAnalysis.bestMove);
+      const engineBestMoveSan = uciToSan(before, beforeAnalysis.bestMove) ?? suggestedMovesBefore[0];
 
       setCurrentEvaluation(afterAnalysis.evaluation);
       setCoachText(
@@ -504,7 +531,7 @@ export default function Page() {
           history: before.history(),
           historyVerbose: before.history({ verbose: true }) as Move[],
           playerColor,
-          engineBestMoveSan: extractSuggestedMoves(before.fen(), beforeAnalysis.topMoves)[0],
+          engineBestMoveSan,
           opponentBestReplySan: opponentReplySan,
           evalBeforeCp: beforeAnalysis.evaluation,
           evalAfterCp: afterAnalysis.evaluation,
@@ -531,7 +558,7 @@ export default function Page() {
         }
       }
 
-      setGame(new Chess(afterPlayerMove.fen()));
+      setGame(cloneGameWithHistory(afterPlayerMove));
       return true;
     } catch {
       if (!afterPlayerMove.isGameOver()) {
@@ -552,14 +579,15 @@ export default function Page() {
           playerColor,
         }),
       );
-      setGame(new Chess(afterPlayerMove.fen()));
+      setGame(cloneGameWithHistory(afterPlayerMove));
       return true;
     } finally {
-      setIsComputerThinking(false);
+      setComputerThinking(false);
     }
   }
 
   function prepareGame(nextChoice = playerSideChoice) {
+    cancelPendingComputerMove();
     const previewColor = getPreviewColor(nextChoice);
     coachFenRef.current = '';
     computerFenRef.current = '';
@@ -573,13 +601,13 @@ export default function Page() {
     setCurrentEvaluation(null);
     setLastEngineMove(null);
     setIsPreparingCoach(false);
-    setIsComputerThinking(false);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
   }
 
   function startGame() {
+    cancelPendingComputerMove();
     const nextPlayerColor = resolvePlayerColor(playerSideChoice);
     coachFenRef.current = '';
     computerFenRef.current = '';
@@ -592,7 +620,6 @@ export default function Page() {
     setCurrentEvaluation(null);
     setLastEngineMove(null);
     setIsPreparingCoach(false);
-    setIsComputerThinking(false);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -631,7 +658,6 @@ export default function Page() {
       </section>
 
       <aside className="sideColumn">
-        <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
         <GameInfo
           game={game}
           hasStarted={hasStarted}
@@ -642,6 +668,14 @@ export default function Page() {
           onSideChange={prepareGame}
           onStartGame={startGame}
         />
+        <CoachPanel
+          explanation={coachText}
+          preMoveCoach={preMoveCoach}
+          isPreparing={isPreparingCoach}
+          voiceSupported={voiceSupported}
+          onReadAloud={handleReadCoachAloud}
+        />
+        <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
         <SettingsPanel
           difficulty={difficulty}
           tempo={tempo}
@@ -656,13 +690,6 @@ export default function Page() {
           onShowEvalBarChange={setShowEvalBar}
           onShowCoordinatesChange={setShowCoordinates}
           onVoiceEnabledChange={setVoiceEnabled}
-        />
-        <CoachPanel
-          explanation={coachText}
-          preMoveCoach={preMoveCoach}
-          isPreparing={isPreparingCoach}
-          voiceSupported={voiceSupported}
-          onReadAloud={handleReadCoachAloud}
         />
         <MoveHistory moves={game.history()} />
       </aside>

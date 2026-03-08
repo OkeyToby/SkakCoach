@@ -1,4 +1,5 @@
 import { Chess, type Color } from 'chess.js';
+import AccordionPanel from '@/components/AccordionPanel';
 import { getGameStatus, getTurnLabel } from '@/lib/chessHelpers';
 
 type SideChoice = 'white' | 'black' | 'random';
@@ -43,8 +44,11 @@ export default function GameInfo({
   const turnLabel = hasStarted ? getTurnLabel(game.turn(), playerColor) : 'Venter på start';
 
   return (
-    <div className="panel">
-      <h2>Status</h2>
+    <AccordionPanel
+      defaultOpen={true}
+      summaryValue={hasStarted ? turnLabel : 'Klar til start'}
+      title="Status"
+    >
       <div className="infoGrid">
         <div className="infoRow">
           <span>Parti</span>
@@ -77,6 +81,6 @@ export default function GameInfo({
       <button className="resetBtn startBtn" disabled={!isReady || isComputerThinking} onClick={onStartGame} type="button">
         {hasStarted ? 'Nyt parti' : 'Start parti'}
       </button>
-    </div>
+    </AccordionPanel>
   );
 }

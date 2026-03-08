@@ -1,3 +1,5 @@
+import AccordionPanel from './AccordionPanel';
+
 type Props = {
   evaluation: number | null;
   visible: boolean;
@@ -19,17 +21,14 @@ export default function EvalBar({ evaluation, visible }: Props) {
 
   const clamped = clampEvaluation(evaluation ?? 0);
   const whiteShare = ((clamped + 500) / 1000) * 100;
+  const label = formatEvaluationLabel(evaluation);
 
   return (
-    <div className="panel evalPanel">
-      <div className="evalHeader">
-        <h2>Evaluering</h2>
-        <strong>{formatEvaluationLabel(evaluation)}</strong>
-      </div>
+    <AccordionPanel defaultOpen={false} summaryValue={label} title="Evaluering">
       <div className="evalBar" aria-label={`Evaluering: ${formatEvaluationLabel(evaluation)}`}>
         <div className="evalBarWhite" style={{ height: `${whiteShare}%` }} />
       </div>
       <p className="evalHint">Toppen favoriserer sort. Bunden favoriserer hvid.</p>
-    </div>
+    </AccordionPanel>
   );
 }

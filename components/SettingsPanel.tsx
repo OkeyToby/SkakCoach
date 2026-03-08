@@ -1,3 +1,5 @@
+import AccordionPanel from './AccordionPanel';
+
 type Difficulty = 'let' | 'mellem' | 'svaer';
 type Tempo = 'hurtig' | 'normal' | 'rolig';
 type Theme = 'classic' | 'forest' | 'ocean';
@@ -34,9 +36,7 @@ export default function SettingsPanel({
   onVoiceEnabledChange,
 }: Props) {
   return (
-    <div className="panel">
-      <h2>Indstillinger</h2>
-
+    <AccordionPanel defaultOpen={false} title="Indstillinger">
       <div className="settingsGrid">
         <label className="settingField">
           <span>Sværhedsgrad</span>
@@ -95,6 +95,6 @@ export default function SettingsPanel({
           <span>{voiceSupported ? 'Læs coachen højt automatisk' : 'Stemme ikke tilgængelig i denne browser'}</span>
         </label>
       </div>
-    </div>
+    </AccordionPanel>
   );
 }

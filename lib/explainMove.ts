@@ -51,6 +51,11 @@ function normalizeSan(san: string): string {
   return san.replace(/[+#?!]/g, '');
 }
 
+function matchesSan(moveSan: string, candidateSan?: string): boolean {
+  if (!candidateSan) return false;
+  return normalizeSan(moveSan) === normalizeSan(candidateSan);
+}
+
 function getOpeningPlan(history: string[], playerColor: Color): string | null {
   const moves = history.map(normalizeSan);
   const first = moves[0];
@@ -182,10 +187,12 @@ export function explainMove(input: ExplainInput): MoveExplanation {
 
   const evalBefore = getPerspectiveScore(evalBeforeCp, playerColor);
   const evalAfter = getPerspectiveScore(evalAfterCp, playerColor);
-  const evalDrop =
+  const matchedEngineBestMove = matchesSan(move.san, engineBestMoveSan);
+  const rawEvalDrop =
     typeof evalBefore === 'number' && typeof evalAfter === 'number'
       ? evalBefore - evalAfter
       : 0;
+  const evalDrop = matchedEngineBestMove ? Math.min(rawEvalDrop, 0) : rawEvalDrop;
 
   const classification = classifyMove(evalDrop);
 
@@ -240,7 +247,12 @@ export function explainMove(input: ExplainInput): MoveExplanation {
   }
 
   let betterMove = 'Overvej et træk der udvikler en officer, kæmper om centrum eller hjælper dig med at rokere.';
-  if (engineBestMoveSan) {
+  if (matchedEngineBestMove) {
+    betterMove = 'Dit træk var allerede engineens bedste forslag i stillingen.';
+    if (openingPlan && moveNumber <= 8) {
+      betterMove = `${betterMove} ${openingPlan}`;
+    }
+  } else if (engineBestMoveSan) {
     betterMove = describeEngineIdea(before, engineBestMoveSan, playerColor);
     if (openingPlan && moveNumber <= 8) {
       betterMove = `${betterMove} ${openingPlan}`;

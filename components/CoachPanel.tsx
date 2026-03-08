@@ -1,4 +1,5 @@
 import { type MoveExplanation, type PreMoveCoach } from '@/lib/explainMove';
+import AccordionPanel from './AccordionPanel';
 
 type Props = {
   explanation: MoveExplanation;
@@ -24,10 +25,15 @@ export default function CoachPanel({
   voiceSupported,
   onReadAloud,
 }: Props) {
+  const summaryValue = preMoveCoach.suggestedMoves[0]
+    ? `Bedst: ${preMoveCoach.suggestedMoves[0]}`
+    : isPreparing
+      ? 'Analyserer...'
+      : explanation.classification;
+
   return (
-    <div className="panel">
-      <div className="panelHeader">
-        <h2>SkakCoach</h2>
+    <AccordionPanel defaultOpen={true} summaryValue={summaryValue} title="SkakCoach">
+      <div className="coachActions">
         <button
           className="voiceBtn"
           disabled={!voiceSupported}
@@ -78,6 +84,6 @@ export default function CoachPanel({
         <h3>Bedre mulighed</h3>
         <p>{explanation.betterMove}</p>
       </div>
-    </div>
+    </AccordionPanel>
   );
 }
