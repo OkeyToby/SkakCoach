@@ -11,6 +11,11 @@ export type OpeningTheoryState = {
   nextExpectedMoveUci: string | null;
 };
 
+export type OpeningTheoryBreakdown = OpeningTheoryState & {
+  firstLeftTheoryPly: number | null;
+  firstLeftTheoryMoveSan: string | null;
+};
+
 export function getOpeningSideChoice(opening: Opening): 'white' | 'black' {
   return opening.side === 'hvid' ? 'white' : 'black';
 }
@@ -19,7 +24,10 @@ function moveToUci(move: Pick<Move, 'from' | 'to' | 'promotion'>): string {
   return `${move.from}${move.to}${move.promotion ?? ''}`;
 }
 
-export function getOpeningTheoryState(opening: Opening, history: Move[]): OpeningTheoryState {
+export function getOpeningTheoryBreakdown(
+  opening: Opening,
+  history: Move[],
+): OpeningTheoryBreakdown {
   let matchedMoves = 0;
   const historyUci = history.map((move) => moveToUci(move));
 
@@ -31,9 +39,10 @@ export function getOpeningTheoryState(opening: Opening, history: Move[]): Openin
     matchedMoves += 1;
   }
 
-  const hasLeftTheory = historyUci.length > matchedMoves;
-  const isComplete = !hasLeftTheory && matchedMoves >= opening.starterMovesUci.length;
-  const isInTheory = !hasLeftTheory && matchedMoves < opening.starterMovesUci.length;
+  const isComplete = matchedMoves >= opening.starterMovesUci.length;
+  const hasLeftTheory = !isComplete && historyUci.length > matchedMoves;
+  const isInTheory = !isComplete && !hasLeftTheory && matchedMoves < opening.starterMovesUci.length;
+  const firstLeftTheoryMove = hasLeftTheory ? history[matchedMoves] ?? null : null;
 
   return {
     matchedMoves,
@@ -43,5 +52,29 @@ export function getOpeningTheoryState(opening: Opening, history: Move[]): Openin
     isComplete,
     nextExpectedMoveSan: isInTheory ? opening.starterMoves[matchedMoves] ?? null : null,
     nextExpectedMoveUci: isInTheory ? opening.starterMovesUci[matchedMoves] ?? null : null,
+    firstLeftTheoryPly: hasLeftTheory ? matchedMoves + 1 : null,
+    firstLeftTheoryMoveSan: firstLeftTheoryMove?.san ?? null,
+  };
+}
+
+export function getOpeningTheoryState(opening: Opening, history: Move[]): OpeningTheoryState {
+  const {
+    matchedMoves,
+    totalMoves,
+    isInTheory,
+    hasLeftTheory,
+    isComplete,
+    nextExpectedMoveSan,
+    nextExpectedMoveUci,
+  } = getOpeningTheoryBreakdown(opening, history);
+
+  return {
+    matchedMoves,
+    totalMoves,
+    isInTheory,
+    hasLeftTheory,
+    isComplete,
+    nextExpectedMoveSan,
+    nextExpectedMoveUci,
   };
 }

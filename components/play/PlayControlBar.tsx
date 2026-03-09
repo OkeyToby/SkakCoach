@@ -28,6 +28,22 @@ function getPlayerColorLabel(playerColor: Color): string {
   return playerColor === 'w' ? 'hvid' : 'sort';
 }
 
+function getSideStatusLabel(
+  hasStarted: boolean,
+  playerColorLabel: string,
+  sideChoice: SideChoice,
+): string {
+  if (hasStarted) {
+    return `Du spiller ${playerColorLabel}`;
+  }
+
+  if (sideChoice === 'random') {
+    return 'Siden vælges ved start';
+  }
+
+  return `Du starter som ${playerColorLabel}`;
+}
+
 export default function PlayControlBar({
   coachStatus,
   hasStarted,
@@ -42,6 +58,7 @@ export default function PlayControlBar({
 }: Props) {
   const playerColorLabel = getPlayerColorLabel(playerColor);
   const startLabel = hasStarted ? 'Nyt parti' : 'Start parti';
+  const sideStatusLabel = getSideStatusLabel(hasStarted, playerColorLabel, sideChoice);
 
   return (
     <div className="panel playControlBar">
@@ -72,9 +89,7 @@ export default function PlayControlBar({
           {isReady ? 'Stockfish klar' : 'Stockfish starter'}
         </span>
         <span className="playStatusPill">{coachStatus}</span>
-        <span className="playStatusPill">
-          {hasStarted ? `Du spiller ${playerColorLabel}` : 'Partiet er ikke startet'}
-        </span>
+        <span className="playStatusPill">{sideStatusLabel}</span>
         {openingStatus ? <span className="playStatusPill playStatusPillTheory">{openingStatus}</span> : null}
       </div>
 

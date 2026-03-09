@@ -10,7 +10,7 @@ type Props = {
 
 function getSummaryValue(theoryState: OpeningTheoryState, hasStarted: boolean): string {
   if (!hasStarted) {
-    return 'Klar til opening-træning';
+    return 'Klar til åbningstræning';
   }
 
   if (theoryState.hasLeftTheory) {
@@ -18,7 +18,7 @@ function getSummaryValue(theoryState: OpeningTheoryState, hasStarted: boolean): 
   }
 
   if (theoryState.isComplete) {
-    return 'Starterline gennemført';
+    return 'Starterlinje gennemført';
   }
 
   return `${theoryState.matchedMoves}/${theoryState.totalMoves} træk i teorien`;

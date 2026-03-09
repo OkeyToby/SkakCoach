@@ -28,7 +28,7 @@ export default function CoachPanel({
   const summaryValue = preMoveCoach.suggestedMoves[0]
     ? `Bedst: ${preMoveCoach.suggestedMoves[0]}`
     : isPreparing
-      ? 'Analyserer...'
+      ? 'Analyserer…'
       : explanation.classification;
 
   return (

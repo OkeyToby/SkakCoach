@@ -760,6 +760,133 @@ ol {
   background: rgba(19, 59, 92, 0.05);
 }
 
+.afterGameReview {
+  display: grid;
+  gap: 18px;
+}
+
+.afterGameReviewHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(32, 41, 58, 0.08);
+}
+
+.afterGameReviewHeaderContent {
+  display: grid;
+  gap: 8px;
+  max-width: 72ch;
+}
+
+.afterGameReviewHeaderContent h3 {
+  font-size: 1.5rem;
+}
+
+.afterGameReviewXp {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  min-width: 112px;
+  min-height: 68px;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: rgba(19, 59, 92, 0.08);
+  color: var(--brand-strong);
+}
+
+.afterGameReviewXp strong {
+  font-size: 1.05rem;
+}
+
+.afterGameReviewXp span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.afterGameReviewStats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.afterGameReviewSections {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.afterGameReviewStat,
+.afterGameReviewNote,
+.afterGameReviewTurningPoint,
+.afterGameReviewTakeaways {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(32, 41, 58, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.afterGameReviewTakeaways {
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 243, 236, 0.9));
+}
+
+.afterGameReviewStat span,
+.afterGameReviewNote strong,
+.afterGameReviewTurningPoint strong,
+.afterGameReviewTakeaways strong,
+.afterGameReviewSectionLabel {
+  font-size: 0.92rem;
+}
+
+.afterGameReviewStat span {
+  color: var(--ink-soft);
+}
+
+.afterGameReviewStat strong {
+  font-size: 1.05rem;
+}
+
+.afterGameReviewSectionLabel {
+  color: var(--accent);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.afterGameReviewNote p,
+.afterGameReviewTurningPoint p,
+.afterGameReviewTakeawayList li {
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.afterGameReviewTakeawayList {
+  display: grid;
+  gap: 10px;
+  padding-left: 18px;
+}
+
+.afterGameReviewToneWin .afterGameReviewXp {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.afterGameReviewToneLoss .afterGameReviewXp {
+  background: var(--danger-soft);
+  color: #b91c1c;
+}
+
+.afterGameReviewToneDraw .afterGameReviewXp {
+  background: var(--warning-soft);
+  color: #8a5b00;
+}
+
 .panel h2 {
   margin-bottom: 14px;
   font-size: 1.05rem;
@@ -961,6 +1088,13 @@ ol {
 }
 
 .coachDetailsSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(19, 59, 92, 0.05);
   cursor: pointer;
   list-style: none;
   font-weight: 700;
@@ -969,6 +1103,17 @@ ol {
 
 .coachDetailsSummary::-webkit-details-marker {
   display: none;
+}
+
+.coachDetailsSummary::after {
+  content: 'Vis';
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.coachDetails[open] .coachDetailsSummary::after {
+  content: 'Skjul';
 }
 
 .coachDetailList {
@@ -1272,6 +1417,9 @@ ol {
 
 .profileHero {
   gap: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(19, 59, 92, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 243, 236, 0.92));
 }
 
 .openingBoardPreview,
@@ -1346,6 +1494,11 @@ ol {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+.profileSectionBlock {
+  display: grid;
+  gap: 18px;
+}
+
 .profileHeroStats span,
 .profileMetricRow span {
   color: var(--ink-soft);
@@ -1358,6 +1511,64 @@ ol {
 .profileMetricList {
   display: grid;
   gap: 12px;
+}
+
+.profileInsightGrid,
+.profileProgressGrid,
+.profileBadgeGrid,
+.profileRecommendationGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.profileInsightCard {
+  border-width: 1px;
+}
+
+.profileInsightCardPositive {
+  background: linear-gradient(180deg, rgba(232, 247, 239, 0.92), rgba(255, 255, 255, 0.92));
+  border-color: rgba(31, 122, 82, 0.16);
+}
+
+.profileInsightCardFocus {
+  background: linear-gradient(180deg, rgba(255, 241, 221, 0.94), rgba(255, 255, 255, 0.92));
+  border-color: rgba(166, 92, 24, 0.16);
+}
+
+.profileInsightCardNeutral {
+  background: linear-gradient(180deg, rgba(238, 245, 255, 0.94), rgba(255, 255, 255, 0.92));
+  border-color: rgba(19, 59, 92, 0.14);
+}
+
+.profileBadgeCard {
+  gap: 12px;
+}
+
+.profileBadgeCardUnlocked {
+  background:
+    radial-gradient(circle at top right, rgba(193, 139, 29, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(255, 249, 233, 0.96), rgba(255, 255, 255, 0.92));
+}
+
+.profileBadgeTrack {
+  overflow: hidden;
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(19, 59, 92, 0.08);
+}
+
+.profileBadgeFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), #4b7aa1);
+}
+
+.profileRecommendationCard {
+  background:
+    radial-gradient(circle at top right, rgba(193, 139, 29, 0.14), transparent 32%),
+    rgba(255, 255, 255, 0.94);
 }
 
 .profileEmptyCard {
@@ -1482,7 +1693,8 @@ ol {
   .puzzleMetaRow,
   .comingSoonIntroHeader,
   .featureCardFooter,
-  .profileMetricRow {
+  .profileMetricRow,
+  .afterGameReviewHeader {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1513,6 +1725,11 @@ ol {
   .playControlMeta,
   .playControlSideChooser {
     width: 100%;
+  }
+
+  .playStatusPill {
+    width: 100%;
+    justify-content: center;
   }
 
   .openingMoveChip {
