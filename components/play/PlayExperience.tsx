@@ -320,6 +320,7 @@ export default function PlayExperience({ openingSlug }: Props) {
   const openingPracticeRecordedRef = useRef(false);
   const settingsLoadedRef = useRef(false);
   const lastSpokenMessageRef = useRef('');
+  const focusAreaRef = useRef<HTMLDivElement | null>(null);
   const coachFenRef = useRef('');
   const computerFenRef = useRef('');
   const completedGameFenRef = useRef('');
@@ -883,21 +884,31 @@ export default function PlayExperience({ openingSlug }: Props) {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        focusAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   }
 
   return (
     <div className="playPage">
       <PageHeader
-        className="pageHeaderCompact"
+        className={`pageHeaderCompact${hasStarted ? ' pageHeaderSession' : ''}`}
         eyebrow={opening ? 'Åbningsspil mod computeren' : 'Spil mod computeren'}
-        title="Spil, forstå og forbedr dig"
+        title={hasStarted ? 'Partiet er i gang' : 'Spil, forstå og forbedr dig'}
         description={
-          opening
-            ? `Du øver ${opening.name}. Start ved brættet, følg den kendte teori og fortsæt derefter med almindelig parti-coach.`
-            : 'Start hurtigt ved brættet, få forslag før dit træk og kompakt feedback undervejs.'
+          hasStarted
+            ? opening
+              ? `Du er i fokusvisning for ${opening.name}. Bræt og råd er samlet herunder, så du kan læse og rykke uden at lede efter panelet.`
+              : 'Bræt og råd er samlet herunder, så du kan læse coachen og rykke fra samme område.'
+            : opening
+              ? `Du øver ${opening.name}. Start ved brættet, følg den kendte teori og fortsæt derefter med almindelig parti-coach.`
+              : 'Start hurtigt ved brættet, få forslag før dit træk og kompakt feedback undervejs.'
         }
         actions={
-          opening && openingHref ? (
+          hasStarted ? null : opening && openingHref ? (
             <>
               <Button href={openingHref} variant="secondary">
                 Til åbningen
@@ -934,77 +945,82 @@ export default function PlayExperience({ openingSlug }: Props) {
             onStartGame={startGame}
           />
 
-          <div className="boardPanel">
-            <div className="boardStage">
-              <ChessBoard
-                position={game.fen()}
-                onMove={onPlayerMove}
-                boardOrientation={playerColor === 'w' ? 'white' : 'black'}
-                disabled={boardDisabled}
-                darkSquareColor={boardTheme.dark}
-                lightSquareColor={boardTheme.light}
-                customSquareStyles={lastEngineMoveStyles}
-                showBoardNotation={showCoordinates}
-              />
+          <div className="playFocusGrid" ref={focusAreaRef}>
+            <div className="boardPanel">
+              <div className="boardStage">
+                <ChessBoard
+                  position={game.fen()}
+                  onMove={onPlayerMove}
+                  boardOrientation={playerColor === 'w' ? 'white' : 'black'}
+                  disabled={boardDisabled}
+                  darkSquareColor={boardTheme.dark}
+                  lightSquareColor={boardTheme.light}
+                  customSquareStyles={lastEngineMoveStyles}
+                  showBoardNotation={showCoordinates}
+                />
 
-              <div className="boardMeta">
-                {!isReady && <p className="statusNote">Stockfish starter…</p>}
-                {!hasStarted && isReady && <p className="statusNote">Tryk Start parti for at begynde.</p>}
-                {isComputerThinking && <p className="thinking">Computeren tænker…</p>}
-                {afterGameReview ? <p className="statusNote">Partiet er slut. Reviewet ligger lige under brættet.</p> : null}
-                {openingBoardNote ? (
-                  <p
-                    className={`statusNote${openingTheoryState?.hasLeftTheory ? ' statusNoteWarning' : ''}`}
-                  >
-                    {openingBoardNote}
-                  </p>
-                ) : null}
+                <div className="boardMeta">
+                  {!isReady && <p className="statusNote">Stockfish starter…</p>}
+                  {!hasStarted && isReady && <p className="statusNote">Tryk Start parti for at begynde.</p>}
+                  {isComputerThinking && <p className="thinking">Computeren tænker…</p>}
+                  {afterGameReview ? <p className="statusNote">Partiet er slut. Reviewet ligger lige under brættet.</p> : null}
+                  {openingBoardNote ? (
+                    <p
+                      className={`statusNote${openingTheoryState?.hasLeftTheory ? ' statusNoteWarning' : ''}`}
+                    >
+                      {openingBoardNote}
+                    </p>
+                  ) : null}
+                </div>
               </div>
+            </div>
+
+            <div className="playCoachColumn">
+              {opening && openingTheoryState ? (
+                <OpeningContextPanel
+                  hasStarted={hasStarted}
+                  opening={opening}
+                  theoryState={openingTheoryState}
+                />
+              ) : null}
+              <CoachPanel
+                explanation={coachText}
+                preMoveCoach={preMoveCoach}
+                isPreparing={isPreparingCoach}
+                voiceSupported={voiceSupported}
+                onReadAloud={handleReadCoachAloud}
+              />
             </div>
           </div>
 
           {afterGameReview ? <AfterGameReviewPanel review={afterGameReview} /> : null}
-        </section>
 
-        <aside className="sideColumn">
-          {opening && openingTheoryState ? (
-            <OpeningContextPanel
+          <div className="playSecondaryGrid">
+            <GameInfo
+              game={game}
               hasStarted={hasStarted}
-              opening={opening}
-              theoryState={openingTheoryState}
+              openingName={opening?.name}
+              playerColor={playerColor}
             />
-          ) : null}
-          <CoachPanel
-            explanation={coachText}
-            preMoveCoach={preMoveCoach}
-            isPreparing={isPreparingCoach}
-            voiceSupported={voiceSupported}
-            onReadAloud={handleReadCoachAloud}
-          />
-          <GameInfo
-            game={game}
-            hasStarted={hasStarted}
-            openingName={opening?.name}
-            playerColor={playerColor}
-          />
-          <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
-          <MoveHistory moves={game.history()} />
-          <SettingsPanel
-            difficulty={difficulty}
-            tempo={tempo}
-            theme={theme}
-            showEvalBar={showEvalBar}
-            showCoordinates={showCoordinates}
-            voiceEnabled={voiceEnabled}
-            voiceSupported={voiceSupported}
-            onDifficultyChange={setDifficulty}
-            onTempoChange={setTempo}
-            onThemeChange={setTheme}
-            onShowEvalBarChange={setShowEvalBar}
-            onShowCoordinatesChange={setShowCoordinates}
-            onVoiceEnabledChange={setVoiceEnabled}
-          />
-        </aside>
+            <EvalBar evaluation={currentEvaluation} visible={showEvalBar} />
+            <MoveHistory moves={game.history()} />
+            <SettingsPanel
+              difficulty={difficulty}
+              tempo={tempo}
+              theme={theme}
+              showEvalBar={showEvalBar}
+              showCoordinates={showCoordinates}
+              voiceEnabled={voiceEnabled}
+              voiceSupported={voiceSupported}
+              onDifficultyChange={setDifficulty}
+              onTempoChange={setTempo}
+              onThemeChange={setTheme}
+              onShowEvalBarChange={setShowEvalBar}
+              onShowCoordinatesChange={setShowCoordinates}
+              onVoiceEnabledChange={setVoiceEnabled}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );

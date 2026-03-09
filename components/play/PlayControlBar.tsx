@@ -61,15 +61,17 @@ export default function PlayControlBar({
   const sideStatusLabel = getSideStatusLabel(hasStarted, playerColorLabel, sideChoice);
 
   return (
-    <div className="panel playControlBar">
+    <div className={`panel playControlBar${hasStarted ? ' playControlBarCompact' : ''}`}>
       <div className="playControlBarTop">
         <div className="playControlBarIntro">
-          <span className="sectionEyebrow">Klar ved brættet</span>
+          <span className="sectionEyebrow">{hasStarted ? 'Fokusvisning' : 'Klar ved brættet'}</span>
           <h2>{hasStarted ? `Du spiller ${playerColorLabel}` : 'Start direkte ved brættet'}</h2>
           <p>
-            {lockedSideReason
-              ? 'Åbningen låser din side. Start partiet herfra og bliv ved brættet.'
-              : 'Vælg side og start partiet uden at lede i sidepanelet.'}
+            {hasStarted
+              ? 'Bræt og råd ligger samlet lige her. Mere partiinfo ligger længere nede, så du kan blive i flowet.'
+              : lockedSideReason
+                ? 'Åbningen låser din side. Start partiet herfra og bliv ved brættet.'
+                : 'Vælg side og start partiet uden at lede i sidepanelet.'}
           </p>
         </div>
 
@@ -93,7 +95,12 @@ export default function PlayControlBar({
         {openingStatus ? <span className="playStatusPill playStatusPillTheory">{openingStatus}</span> : null}
       </div>
 
-      {lockedSideReason ? (
+      {hasStarted ? (
+        <div className="openingLockNote playControlLockNote">
+          <strong>Spilfokus</strong>
+          <p>Læs coachens råd og ryk direkte fra samme område. Resten er flyttet ned som sekundær info.</p>
+        </div>
+      ) : lockedSideReason ? (
         <div className="openingLockNote playControlLockNote">
           <strong>Siden er låst af åbningen</strong>
           <p>{lockedSideReason}</p>

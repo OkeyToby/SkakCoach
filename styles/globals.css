@@ -653,7 +653,7 @@ ol {
 
 .playLayout {
   align-items: start;
-  grid-template-columns: minmax(0, 1.24fr) minmax(300px, 0.76fr);
+  grid-template-columns: 1fr;
 }
 
 .boardColumn,
@@ -693,6 +693,15 @@ ol {
   padding: 18px;
 }
 
+.pageHeaderSession {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.pageHeaderSession .pageHeaderContent {
+  max-width: 82ch;
+}
+
 .playControlBar {
   display: grid;
   gap: 16px;
@@ -700,6 +709,11 @@ ol {
   background:
     radial-gradient(circle at top right, rgba(19, 59, 92, 0.08), transparent 34%),
     rgba(255, 255, 255, 0.94);
+}
+
+.playControlBarCompact {
+  gap: 14px;
+  padding: 16px 18px;
 }
 
 .playControlBarTop,
@@ -732,6 +746,36 @@ ol {
 
 .playControlBarButton {
   min-width: 180px;
+}
+
+.playFocusGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.16fr) minmax(320px, 0.84fr);
+  align-items: start;
+}
+
+.playFocusGrid > .boardPanel {
+  order: 1;
+}
+
+.playFocusGrid > .playCoachColumn {
+  order: 2;
+}
+
+.playCoachColumn,
+.playSecondaryGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.playCoachColumn {
+  position: sticky;
+  top: 88px;
+}
+
+.playSecondaryGrid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .playStatusPill,
@@ -1630,8 +1674,21 @@ ol {
   .homeSplitGrid,
   .openingOverviewSplit,
   .openingDetailGrid,
-  .openingQuizLayout {
+  .openingQuizLayout,
+  .playFocusGrid {
     grid-template-columns: 1fr;
+  }
+
+  .playCoachColumn {
+    position: static;
+  }
+
+  .playFocusGrid > .boardPanel {
+    order: 2;
+  }
+
+  .playFocusGrid > .playCoachColumn {
+    order: 1;
   }
 }
 
@@ -1683,6 +1740,10 @@ ol {
     width: 100%;
   }
 
+  .playSecondaryGrid {
+    grid-template-columns: 1fr;
+  }
+
   .coachPreviewHeader,
   .coachSummary,
   .infoRow,
@@ -1725,6 +1786,10 @@ ol {
   .playControlMeta,
   .playControlSideChooser {
     width: 100%;
+  }
+
+  .playFocusGrid {
+    gap: 14px;
   }
 
   .playStatusPill {
